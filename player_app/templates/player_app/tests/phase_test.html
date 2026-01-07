@@ -1,0 +1,208 @@
+{% extends "player_app/organization/base.html" %}
+{% load static %}
+
+{% block title %}Test Dashboard{% endblock %}
+
+{% block extra_head %}
+    <style>
+        table { width: 80%; border-collapse: collapse; margin: 2em auto; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: center; }
+        th { background: #f7f7f7; }
+        .btn { padding: 8px 16px; cursor: pointer; border-radius: 3px; order: none; }
+        .add-btn { background: #1976d2; color: #ffffffff; }
+        .view-btn { background: #43a047; color: #fff; }
+        .create-btn { background: #ff9800; color: #fff; margin: 1em auto; display: block; }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <h2 style="text-align:center;">Add Test {{ phase.name }}</h2>
+  <table>
+        <thead>
+            <tr>
+                <th>No</th>
+                <th>Test Name</th>
+                <th>Add Test Result</th>
+               
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Yo-Yo Test</td>
+                <td><a href="{% url 'add_yoyo_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+                
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>10m Test</td>
+                <td><a href="{% url 'add_ten_meter_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>20m Test</td>
+                <td><a href="{% url 'add_twenty_meter_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>40m Test</td>
+                <td><a href="{% url 'add_forty_meter_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>1 Mile Test</td>
+                <td><a href="{% url 'add_one_mile_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td>2 Km Test</td>
+                <td><a href="{% url 'add_two_km_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>Push-Ups Test</td>
+                <td><a href="{% url 'add_pushups_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            <tr>
+                <td>8</td>
+                <td>Run A 3 Test</td>
+                <td><a href="{% url 'add_runa3_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>9</td>
+                <td>SBJ (Standing Broad Jump)</td>
+                <td><a href="{% url 'add_sbj_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>10</td>
+                <td>Run A 3x6 </td>
+                <td><a href="{% url 'add_run_3x6_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+             <tr>
+                <td>11</td>
+                <td>S/L Glute Bridges</td>
+                <td><a href="{% url 'add_glute_bridges_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>12</td>
+                <td>SL Lunge Calf Raises</td>
+                <td><a href="{% url 'add_lunge_calf_raises_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>13</td>
+                <td>MB Rotational Throws</td>
+                <td><a href="{% url 'add_mb_rotational_throw_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>14</td>
+                <td>Copen Hagen Test</td>
+                <td><a href="{% url 'add_copen_hagen_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>15</td>
+                <td>S/L Hop Test</td>
+                <td><a href="{% url 'add_sl_hop_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>16</td>
+                <td>CMJ Scores</td>
+                <td><a href="{% url 'add_cmj_scores_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>17</td>
+                <td>Anthropometry Test</td>
+                <td><a href="{% url 'add_anthropometry_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>18</td>
+                <td>DEXA Scan Test</td>
+                <td><a href="{% url 'add_dexa_scan_test'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>19</td>
+                <td>Blood Tests</td>
+                <td><a href="{% url 'add_blood_tests_test' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>20</td>
+                <td>MSK Injury Assessment</td>
+                <td><a href="{% url 'add_msk_injury_assessment' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+            <tr>
+                <td>21</td>
+                <td>Player Daily Wellness</td>
+                <td><a href="{% url 'daily_wellness_create_view' %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    <br>    
+    <br><br>
+<script>
+(function() {
+    function parseVal(id) {
+        var el = document.getElementById(id);
+        if (!el) return null;
+        var v = el.value;
+        return v === "" ? null : parseFloat(v);
+    }
+
+    // ... your existing updateAverage() and updateGluteBridges() here ...
+
+    // === SL Lunge Calf Raises Calculations ===
+    function updateLungeCalfRaises() {
+        var right = parseVal("sl_lunge_calf_right");
+        var left = parseVal("sl_lunge_calf_left");
+
+        var diffDisplay = document.getElementById("sl_lunge_calf_diff_display");
+        var diffHidden = document.getElementById("sl_lunge_calf_diff");
+        var ratioDisplay = document.getElementById("sl_lunge_calf_ratio_display");
+        var ratioHidden = document.getElementById("sl_lunge_calf_ratio");
+
+        // S/L Difference (absolute, always positive)
+        if (!isNaN(right) && !isNaN(left)) {
+            var diff = Math.abs(left - right);  // absolute difference[web:21][web:25]
+            diffDisplay.value = diff.toFixed(0);
+            diffHidden.value = diff.toFixed(0);
+        } else {
+            diffDisplay.value = "";
+            diffHidden.value = "";
+        }
+
+        // SLG Ratio (Left ÷ Right)
+        if (!isNaN(left) && !isNaN(right) && right !== 0) {
+            var ratio = left / right;
+            ratioDisplay.value = ratio.toFixed(3);
+            ratioHidden.value = ratio.toFixed(3);
+        } else {
+            ratioDisplay.value = "";
+            ratioHidden.value = "";
+        }
+    }
+
+    // Existing listeners for trials and glute bridges...
+    var trialIds = ["trial1","trial2","trial3","trial4","trial5","trial6"];
+    trialIds.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", updateAverage); // uses input event for live updates[web:32]
+        }
+    });
+
+    ["sl_glute_right", "sl_glute_left"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", updateGluteBridges);
+        }
+    });
+
+    // New listeners for SL Lunge Calf Raises
+    ["sl_lunge_calf_right", "sl_lunge_calf_left"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", updateLungeCalfRaises);
+        }
+    });
+})();
+</script>
+
+{% endblock %}
