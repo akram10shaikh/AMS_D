@@ -145,11 +145,13 @@ LOGIN_URL = 'organization_login'
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS=[BASE_DIR /'static',
-                  'player_app/static',
-                  'form/static',
-                  'accounts/static',
-                  ]
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+    BASE_DIR / 'player_app' / 'static',
+    BASE_DIR / 'form' / 'static',
+    BASE_DIR / 'accounts' / 'static',
+]
+
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
