@@ -1,0 +1,702 @@
+{% extends "player_app/tests/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container" style="max-width:1200px;margin:0 auto;padding:20px 0;margin-bottom:60px;">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div>
+      <h2 style="margin:0 0 6px;">All Test Results</h2>
+      
+      <p style="margin:0;color:#666;font-size:14px;">
+        Player: <strong>{{ player.name }}</strong>
+        {% if player.age_category %} | Category: {{ player.get_age_category_display }}{% endif %}
+      </p>
+    </div>
+    <a href="{% url 'organization_player_detail' player.id %}"
+       class="btn btn-secondary"
+       style="padding:8px 14px;border-radius:20px;font-size:13px;">
+      ← Back to profile
+    </a>
+  </div>
+
+  <!-- Helper macro-like include style: each block = one table -->
+
+  {# 10m #}
+  {% if tests_10m %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">10m Sprint</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Time (s)</th>
+            <th>Reported By</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_10m %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.best is not None %}{{ t.best }}{% else %}—{% endif %}</td>
+            
+            <td>{% if t.reported_by %}{{ t.reported_by.get_full_name|default:t.reported_by.username }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {# 20m (same structure as 10m) #}
+  {% if tests_20m %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">20m Sprint</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Phase / Camp</th><th>Time (s)</th><th>Reported By</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_20m %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.best is not None %}{{ t.best }}{% else %}—{% endif %}</td>
+           
+            <td>{% if t.reported_by %}{{ t.reported_by.get_full_name|default:t.reported_by.username }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if tests_40m %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">40m Sprint</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Phase / Camp</th><th>Time (s)</th><th>Reported By</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_40m %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.best is not None %}{{ t.best }}{% else %}—{% endif %}</td>
+
+            <td>{% if t.reported_by %}{{ t.reported_by.get_full_name|default:t.reported_by.username }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {# YoYo example with distance + VO2 #}
+  {% if tests_yoyo %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">YoYo Test</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Distance Covered (m)</th>
+            <th>Predicted VO₂max</th>
+            <th>Best Level</th>
+            <th>Reported By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_yoyo %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.distance_covered %}{{ t.distance_covered }}{% else %}—{% endif %}</td>
+            <td>{% if t.predicted_vo2max %}{{ t.predicted_vo2max|floatformat:1 }}{% else %}—{% endif %}</td>
+            <td>{% if t.best is not None %}{{ t.best }}{% else %}—{% endif %}</td>
+            <td>{% if t.reported_by %}{{ t.reported_by.get_full_name|default:t.reported_by.username }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {# Example asymmetry test: S/L Glute Bridges #}
+  {{ data }}
+{% if tests_s_l_glute_bridges %} 
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">S/L Glute Bridges</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Right (sec)</th>
+            <th>Left (sec)</th>
+            <th>Difference</th>
+            <th>Ratio</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_s_l_glute_bridges %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.right is not None %}{{ t.right }}{% else %}—{% endif %}</td>
+            <td>{% if t.left is not None %}{{ t.left }}{% else %}—{% endif %}</td>
+            <td>{% if t.difference is not None %}{{ t.difference }}{% else %}—{% endif %}</td>
+            <td>{% if t.ratio is not None %}{{ t.ratio|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if tests_sl_lunge_calf_raises %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">S/L Lunge Calf Raises</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Right (sec)</th>
+            <th>Left (sec)</th>
+            <th>Difference</th>
+            <th>Ratio</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_sl_lunge_calf_raises %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.right is not None %}{{ t.right }}{% else %}—{% endif %}</td>
+            <td>{% if t.left is not None %}{{ t.left }}{% else %}—{% endif %}</td>
+            <td>{% if t.difference is not None %}{{ t.difference }}{% else %}—{% endif %}</td>
+            <td>{% if t.ratio is not None %}{{ t.ratio|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if tests_mb_rotational_throws %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">MB Rotational Throws</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Right (sec)</th>
+            <th>Left (sec)</th>
+            <th>Difference</th>
+            <th>Ratio</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_mb_rotational_throws %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.right is not None %}{{ t.right }}{% else %}—{% endif %}</td>
+            <td>{% if t.left is not None %}{{ t.left }}{% else %}—{% endif %}</td>
+            <td>{% if t.difference is not None %}{{ t.difference }}{% else %}—{% endif %}</td>
+            <td>{% if t.ratio is not None %}{{ t.ratio|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+
+  {% if tests_copenhagen %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">Copenhagen</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Right (sec)</th>
+            <th>Left (sec)</th>
+            <th>Difference</th>
+            <th>Ratio</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_copenhagen %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.right is not None %}{{ t.right }}{% else %}—{% endif %}</td>
+            <td>{% if t.left is not None %}{{ t.left }}{% else %}—{% endif %}</td>
+            <td>{% if t.difference is not None %}{{ t.difference }}{% else %}—{% endif %}</td>
+            <td>{% if t.ratio is not None %}{{ t.ratio|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if tests_s_l_hop %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">S/L Hop</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Phase / Camp</th>
+            <th>Right (sec)</th>
+            <th>Left (sec)</th>
+            <th>Difference</th>
+            <th>Ratio</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_s_l_hop %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{% if t.phase %}{{ t.phase.name }}{% else %}—{% endif %}</td>
+            <td>{% if t.right is not None %}{{ t.right }}{% else %}—{% endif %}</td>
+            <td>{% if t.left is not None %}{{ t.left }}{% else %}—{% endif %}</td>
+            <td>{% if t.difference is not None %}{{ t.difference }}{% else %}—{% endif %}</td>
+            <td>{% if t.ratio is not None %}{{ t.ratio|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+
+  {# CMJ Scores #}
+  {% if tests_cmj_scores %}
+  <section style="margin-bottom:24px;">
+    <h3 style="font-size:17px;margin-bottom:10px;">CMJ Scores</h3>
+    <div class="card-shadow">
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Jump Type</th>
+            <th>Load (kg)</th>
+            <th>Jump Height (cm)</th>
+            <th>Flight Time (ms)</th>
+            <th>Contact Time (ms)</th>
+            <th>Power</th>
+            <th>RSI</th>
+            <th>Readiness</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tests_cmj_scores %}
+          <tr>
+            <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+            <td>{{ t.cmj_jump_type|default:"—" }}</td>
+            <td>{% if t.cmj_load %}{{ t.cmj_load }}{% else %}—{% endif %}</td>
+            <td>{% if t.cmj_jump_height %}{{ t.cmj_jump_height }}{% else %}—{% endif %}</td>
+            <td>{% if t.cmj_flight_time %}{{ t.cmj_flight_time }}{% else %}—{% endif %}</td>
+            <td>{% if t.cmj_contact_time %}{{ t.cmj_contact_time }}{% else %}—{% endif %}</td>
+            <td>{% if t.cmj_power %}{{ t.cmj_power }}{% else %}—{% endif %}</td>
+            <td>{% if t.cmj_reactive_strength_index %}{{ t.cmj_reactive_strength_index }}{% else %}—{% endif %}</td>
+            <td>
+              {% if t.cmj_readiness_color %}
+                <span style="padding:3px 8px;border-radius:10px;background:{{ t.cmj_readiness_color }};color:#fff;">
+                  {{ t.cmj_readiness_color }}
+                </span>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% comment %} Anthropometry {% endcomment %}
+    {% if tests_anthropometry %}
+    <section style="margin-bottom:24px;">
+      <h3 style="font-size:17px;margin-bottom:10px;">Anthropometry</h3>
+      <div class="card-shadow">
+        <table class="test-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Height (cm)</th>
+              <th>Weight (kg)</th>
+                <th>Age (years)</th>
+                <th>Chest (mm)</th>
+                <th>Mid Axillary (mm)</th>
+                <th>Subscapular (mm)</th>
+                <th>Triceps (mm)</th>
+                <th>Abdomen (mm)</th>
+                <th>Suprailiac (mm)</th>
+                <th>Mid Thigh (mm)</th>
+                <th>Total Skinfold (mm)</th>
+                <th>Body Density (g/cm³)</th>
+                <th>Body Fat Percentage (%)</th>
+                <th>Error Corrected (mm)</th>
+                <th>Chest N (cm)</th>
+                <th>Chest E (cm)</th>
+                <th>Upper Arm (cm)</th>
+                <th>Waist (cm)</th>
+                <th>Abdomen (cm)</th>
+                <th>Hip (cm)</th>
+                <th>Thigh (cm)</th>   
+                <th>Calf (cm)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tests_anthropometry %}
+            <tr>
+              <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+              <td>{% if t.anthropometry_weight %}{{ t.anthropometry_height }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_weight %}{{ t.anthropometry_weight }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_age %}{{ t.anthropometry_age }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_chest %}{{ t.anthropometry_chest }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_mid_axillary %}{{ t.anthropometry_mid_axillary }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_subscapular %}{{ t.anthropometry_subscapular }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_triceps %}{{ t.anthropometry_triceps }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_abdomen %}{{ t.anthropometry_abdomen }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_suprailiac %}{{ t.anthropometry_suprailiac }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_mid_thigh %}{{ t.anthropometry_mid_thigh }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_total_skinfold %}{{ t.anthropometry_total_skinfold }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_body_density %}{{ t.anthropometry_body_density }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_fat_percentage %}{{ t.anthropometry_fat_percentage }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_error_corrected %}{{ t.anthropometry_error_corrected }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_chest_n %}{{ t.anthropometry_chest_n }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_chest_e %}{{ t.anthropometry_chest_e }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_upper_arm %}{{ t.anthropometry_upper_arm }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_waist %}{{ t.anthropometry_waist }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_abdomen_cm %}{{ t.anthropometry_abdomen_cm }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_hip %}{{ t.anthropometry_hip }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_thigh %}{{ t.anthropometry_thigh }}{% else %}—{% endif %}</td>
+              <td>{% if t.anthropometry_calf %}{{ t.anthropometry_calf }}{% else %}—{% endif %}</td>
+              <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+  {# Anthropometry, Blood, DEXA similar: pick only their relevant fields per table #}
+
+    <!-- Blood Tests -->
+    {% if tests_blood_work %}
+    <section style="margin-bottom:24px;">
+      <h3 style="font-size:17px;margin-bottom:10px;">Blood Tests</h3>
+      <div class="card-shadow">
+        <table class="test-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+                <th>Hemoglobin</th>
+                <th>RBC</th>
+                <th>Platelets</th>
+                <th>Albumin</th>
+                <th>Globulin</th>
+                <th>Uric Acid</th>
+                <th>Creatinine</th>
+                <th>Testosterone</th>
+                <th>Iron</th>
+
+                <th>Vitamin D3</th>
+                <th>Cholesterol</th>
+                <th>HDL</th>
+                <th>LDL</th>
+                <th>LDL/HDL Ratio</th>
+                <th>Vitamin B12</th>
+                <th>Lipoprotein</th>
+                <th>Homocysteine</th>
+                <th>Protein</th>
+                <th>T3</th>
+                <th>T4</th>
+                <th>TSH</th>
+
+
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tests_blood_work %}
+            <tr>
+                <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+                <td>{% if t.blood_hemoglobin %}{{ t.blood_hemoglobin }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_rbc %}{{ t.blood_rbc }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_platelets %}{{ t.blood_platelets }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_albumin %}{{ t.blood_albumin }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_globulin %}{{ t.blood_globulin }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_uric_acid %}{{ t.blood_uric_acid }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_creatinine %}{{ t.blood_creatinine }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_testosterone %}{{ t.blood_testosterone }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_iron %}{{ t.blood_iron }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_vitamin_d3 %}{{ t.blood_vitamin_d3 }}{% else %}—{% endif %}</td>
+
+                <td>{% if t.blood_cholesterol %}{{ t.blood_cholesterol }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_hdl %}{{ t.blood_hdl }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_ldl %}{{ t.blood_ldl }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_ldl_hdl_ratio %}{{ t.blood_ldl_hdl_ratio }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_vitamin_b12 %}{{ t.blood_vitamin_b12 }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_lipoprotein %}{{ t.blood_lipoprotein }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_homocysteine %}{{ t.blood_homocysteine }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_protein %}{{ t.blood_protein }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_t3 %}{{ t.blood_t3 }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_t4 %}{{ t.blood_t4 }}{% else %}—{% endif %}</td>
+                <td>{% if t.blood_tsh %}{{ t.blood_tsh }}{% else %}—{% endif %}</td>
+
+                <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- DEXA Tests -->
+    {% if tests_dexa_scan_test %} 
+    <section style="margin-bottom:24px;">
+      <h3 style="font-size:17px;margin-bottom:10px;">DEXA Scans</h3>
+      <div class="card-shadow">
+        <table class="test-table">
+          <thead>
+            <tr>
+                <th>Date</th>
+                <th>Height (cm)</th>
+                <th>Weight (kg)</th>
+                <th>BMI</th>
+                <th>RMR</th>
+                <th>BMD</th>
+                <th>T-Score</th>
+                <th>Total Fat (kg)</th>
+                <th>Lean Mass (kg)</th>
+                <th>Lean Mass %</th>
+                <th>Testosterone</th>
+                <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tests_dexa_scan_test %}
+            <tr>
+              <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+              <td>{% if t.dexa_height %}{{ t.dexa_height }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_weight %}{{ t.dexa_weight }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_bmi %}{{ t.dexa_bmi }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_rmr %}{{ t.dexa_rmr }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_bmd %}{{ t.dexa_bmd }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_tscore %}{{ t.dexa_tscore }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_total_fat %}{{ t.dexa_total_fat }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_lean %}{{ t.dexa_lean }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_lean_mass %}{{ t.dexa_lean_mass }}{% else %}—{% endif %}</td>
+              <td>{% if t.dexa_testosterone %}{{ t.dexa_testosterone }}{% else %}—{% endif %}</td>
+              <td>{% if t.notes %}{{ t.notes|truncatechars:50 }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if tests_msk_injury_assessment %}
+<section style="margin-bottom:24px;">
+  <h3 style="font-size:17px;margin-bottom:10px;">MSK Injury Assessment</h3>
+  <div class="card-shadow">
+    <table class="test-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Phase</th>
+          <th>physiotherapist_name</th>
+          <th>height</th>
+          <th>weight</th>
+          <th>skills</th>
+          <th>participation_category</th>
+          <th>dominant_side</th>
+          <th>lead_leg</th>
+          <th>rear_foot_right</th>
+          <th>rear_foot_left</th>
+          <th>mid_foot_right</th>
+          <th>mid_foot_left</th>
+          <th>lld</th>
+          <th>df_lunge_right</th>
+          <th>df_lunge_left</th>
+          <th>tibial_dial_right</th>
+          <th>tibial_dial_left</th>
+          <th>hip_ir_90_supine_right</th>
+          <th>hip_ir_90_supine_left</th>
+          <th>fabers_right</th>
+          <th>fabers_left</th>
+          <th>shoulder_ir_90_right</th>
+          <th>shoulder_ir_90_left</th>
+          <th>shoulder_er_90_right</th>
+          <th>shoulder_er_90_left</th>
+          <th>pec_minor_length_right</th>
+          <th>pec_minor_length_left</th>
+          <th>thoracic_rotation_right</th>
+          <th>thoracic_rotation_left</th> 
+          <th>thomas_pos1_right</th>
+          <th>thomas_pos1_left</th>
+          <th>thomas_pos2_right</th>
+          <th>thomas_pos2_left</th>
+          <th>thomas_pos3_right</th>
+          <th>thomas_pos3_left</th>
+          <th>thomas_pos4_right</th>
+          <th>thomas_pos4_left</th>
+          <th>anterior_apprehension_right</th>
+          <th>anterior_apprehension_left</th>
+          <th>relocation_right</th>
+          <th>relocation_left</th>
+          <th>gird_erg_right</th>
+          <th>gird_erg_left</th>
+          <th>hk_test_right</th>
+          <th>hk_test_left</th>
+          <th>obriens_right</th>
+          <th>obriens_left</th>
+          <th>Reported By</th>
+          
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tests_msk_injury_assessment %}
+        <tr>
+          <td>{{ t.date|default:t.created_at|date:"d M Y" }}</td>
+          <td>{% if t.phase %}{{ t.phase.name|default:t.phase }}{% else %}—{% endif %}</td>
+          <td>{% if t.physiotherapist_name %}{{ t.physiotherapist_name }}{% else %}—{% endif %}</td>
+          <td>{% if t.height %}{{ t.height }}{% else %}—{% endif %}</td>
+          <td>{% if t.weight %}{{ t.weight }}{% else %}—{% endif %}</td>
+          <td>{% if t.skills %}{{ t.skills }}{% else %}—{% endif %}</td>
+          <td>{% if t.participation_category %}{{ t.participation_category }}{% else %}—{% endif %}</td>
+          <td>{% if t.dominant_side %}{{ t.dominant_side }}{% else %}—{% endif %}</td>
+          <td>{% if t.lead_leg %}{{ t.lead_leg }}{% else %}—{% endif %}</td>
+          <td>{% if t.rear_foot_right %}{{ t.rear_foot_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.rear_foot_left %}{{ t.rear_foot_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.mid_foot_right %}{{ t.mid_foot_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.mid_foot_left %}{{ t.mid_foot_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.mid_foot_right %}{{ t.mid_foot_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.lld %}{{ t.lld }}{% else %}—{% endif %}</td>
+          <td>{% if t.df_lunge_left %}{{ t.df_lunge_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.tibial_dial_right %}{{ t.tibial_dial_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.tibial_dial_left %}{{ t.tibial_dial_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.hip_ir_90_supine_right %}{{ t.hip_ir_90_supine_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.hip_ir_90_supine_left %}{{ t.hip_ir_90_supine_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.fabers_right %}{{ t.fabers_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.fabers_left %}{{ t.fabers_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.shoulder_ir_90_right %}{{ t.shoulder_ir_90_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.shoulder_ir_90_left %}{{ t.shoulder_ir_90_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.shoulder_er_90_right %}{{ t.shoulder_er_90_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.shoulder_er_90_left %}{{ t.shoulder_er_90_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.pec_minor_length_right %}{{ t.pec_minor_length_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.pec_minor_length_left %}{{ t.pec_minor_length_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.thoracic_rotation_right %}{{ t.thoracic_rotation_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.thoracic_rotation_left %}{{ t.thoracic_rotation_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos1_right %}{{ t.thomas_pos1_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos1_left %}{{ t.thomas_pos1_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos2_right %}{{ t.thomas_pos2_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos2_left %}{{ t.thomas_pos2_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos3_right %}{{ t.thomas_pos3_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos3_left %}{{ t.thomas_pos3_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos4_right %}{{ t.thomas_pos4_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.thomas_pos4_left %}{{ t.thomas_pos4_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.anterior_apprehension_right %}{{ t.anterior_apprehension_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.anterior_apprehension_left %}{{ t.anterior_apprehension_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.relocation_right %}{{ t.relocation_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.relocation_left %}{{ t.relocation_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.gird_erg_right %}{{ t.gird_erg_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.gird_erg_left %}{{ t.gird_erg_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.hk_test_right %}{{ t.hk_test_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.hk_test_left %}{{ t.hk_test_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.obriens_right %}{{ t.obriens_right }}{% else %}—{% endif %}</td>
+          <td>{% if t.obriens_left %}{{ t.obriens_left }}{% else %}—{% endif %}</td>
+          <td>{% if t.reported_by %}{{ t.reported_by.get_full_name|default:t.reported_by.username|default:"—" }}{% else %}—{% endif %}</td>
+         
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+
+</div>
+
+<style>
+.card-shadow {
+  background:#fff;
+  border-radius:12px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.06);
+  overflow-x:auto;
+}
+.test-table {
+  width:100%;
+  border-collapse:collapse;
+  min-width:700px;
+}
+.test-table thead tr {
+  background:#f8f9fa;
+  border-bottom:1px solid #dee2e6;
+}
+.test-table th,
+.test-table td {
+  padding:9px 12px;
+  font-size:13px;
+  text-align:left;
+  white-space:nowrap;
+}
+.test-table tbody tr:nth-child(even) {
+  background:#fdfdfe;
+}
+</style>
+{% endblock %}

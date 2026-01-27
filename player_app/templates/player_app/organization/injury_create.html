@@ -1,0 +1,347 @@
+{% extends "player_app/organization/base.html" %}
+{% load static %}
+{% block extra_head %}
+    <style>
+        /* Your existing styling here */
+      
+        .form-section { margin-top: 30px; background: #fff; padding: 36px 36px 24px 36px;
+            border-radius: 12px; box-shadow: 0 2px 14px rgba(34,34,34,0.06);}
+        .form-section h2 { color: #28304f; margin-bottom: 20px; }
+        form { width: 100%; }
+        .form-row.two-col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 36px; margin-bottom: 28px; }
+        .player-details-grid { display: flex; gap: 35px; margin-bottom: 22px; }
+        .player-details table { font-size: 1em; color: #222f44; line-height: 1.7; }
+        .player-details td { padding: 3px 18px 3px 0; }
+        .player-photo img { border-radius: 10px; width: 110px; height: 115px; object-fit: cover;
+            border: 3px solid #e2e8f0;}
+        .form-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px 22px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 10px; }
+        .form-group label { color: #596080; margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { padding: 8px 10px; border: 1px solid #e1e5ec;
+            border-radius: 7px; background: #f5f6fa; font-size: 1em; outline: none; }
+        .form-group .body-diagram { width: 100%; max-width: 130px; margin: 4px 0; display: block; }
+        .submit-btn { display: block; margin: 24px 0 0 0; padding: 13px 47px; background: #6c47d3;
+            color: #fff; font-weight: bold; border: none; border-radius: 7px; font-size: 1.2em; cursor: pointer;
+            transition: background 0.2s; }
+        .submit-btn:hover { background: #563ab7; }
+        .body-container {
+            position: relative;
+            display: inline-block;
+            }
+            #body-diagram {
+            width: 300px;
+            height: auto;
+            display: block;
+            }
+            .marker {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: red;
+            border-radius: 50%;
+            pointer-events: none;
+            border: 2px solid white;
+            box-shadow: 0 0 4px #000;
+            z-index: 2;
+            transform: translate(-50%, -50%);
+            }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <div class="form-section">
+        <h2>Create injury</h2>
+        <form method="POST" novalidate>
+            {% csrf_token %}
+            
+            <div class="form-row two-col">
+                <div class="form-group">
+                    <label for="{{ form.player.id_for_label }}">Player Name</label>
+                    {{ form.player }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.reported_by.id_for_label }}">Reported By (Physio)</label>
+                    {{ form.reported_by }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.injury_date.id_for_label }}">Injury Date</label>
+                    {{ form.injury_date }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.name.id_for_label }}">Title</label>
+                    {{ form.name }}
+                </div>
+            </div>
+
+            <!-- Player info section initially hidden -->
+            <div class="player-details-grid" id="player-details-section" style="display:none;">
+                <div class="player-details">
+                    <table>
+                        <tr><td>Name</td><td id="p-name"></td></tr>
+                        <tr><td>Gender</td><td id="p-gender"></td></tr>
+                        <tr><td>Age</td><td id="p-age"></td></tr>
+                        <tr><td>Email Address</td><td id="p-email"></td></tr>
+                        <tr><td>Role</td><td id="p-role"></td></tr>
+                        <tr><td>Bowling style</td><td id="p-bowling_style"></td></tr>
+                    </table>
+                </div>
+                <div class="player-details">
+                    <table>
+                        <tr><td>Player id</td><td id="p-id"></td></tr>
+                        <tr><td>Date of Birth</td><td id="p-dob"></td></tr>
+                        <tr><td>Contact number</td><td id="p-contact"></td></tr>
+                        <tr><td>Handedness</td><td id="p-handedness"></td></tr>
+                        <tr><td>Batting style</td><td id="p-batting_style"></td></tr>
+                        <tr><td>District cricket association id</td><td id="p-district"></td></tr>
+                    </table>
+                </div>
+                <div class="player-photo">
+                    <img id="p-photo" src="" alt="player photo">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.severity.id_for_label }}">Severity</label>
+                    {{ form.severity_rating }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.venue.id_for_label }}">Venue</label>
+                    {{ form.venue }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.team.id_for_label }}">Team</label>
+                    {{ form.team }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.type_of_activity.id_for_label }}">Type of activity at time of injury</label>
+                    {{ form.type_of_activity }}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.diagnosis_date.id_for_label }}">Diagnosis Date</label>
+                    {{ form.diagnosis_date }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.nature_of_injury.id_for_label }}">Nature of injury</label>
+                    {{ form.nature_of_injury }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.action_taken.id_for_label }}">Action Taken</label>
+                    {{ form.action_taken }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.notes.id_for_label }}">Notes</label>
+                    {{ form.notes }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.traning_participation.id_for_label }}">Traning Participation</label>
+                    {{ form.traning_participation }}
+                </div>
+                <div class="form-group">
+                <label for="{{ form.unknown_injury_date.id_for_label }}">Expected Unknown Date</label>
+                <span>
+                    {{ form.unknown_injury_date }} The Injury recovery date is unknown
+                </span>
+                </div>
+
+                <div class="form-group">
+                <label for="{{ form.expected_date_of_return.id_for_label }}">Expected Date of Return</label>
+                {{ form.expected_date_of_return }}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.player_status.id_for_label }}">Player Status</label>
+                    {{ form.player_status }}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.camp_tournament.id_for_label }}">Camp/Tournament</label>
+                    {{ form.camp_tournament }}
+                    {% if form.camp_tournament.errors %}
+                        <div class="text-danger">{{ form.camp_tournament.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="{{ form.severity.id_for_label }}">Side</label>
+                    {{ form.side }}
+                </div>
+                 <div class="form-group">
+                     <label for="part-select">Body part effected</label><br>
+                        <select id="part-select" multiple size="12" name="affected_body_part" class="form-control">
+                            <option value="head">Head</option>
+                            <option value="neck">Neck</option>
+                            <option value="chest">Chest</option>
+                            <option value="obliques-left">Obliques Left</option>
+                            <option value="obliques-right">Obliques Right</option>
+                            <option value="abdomen">Abdomen</option>
+                            <option value="rotator-cuff-left">Rotator Cuff Left</option>
+                            <option value="rotator-cuff-right">Rotator Cuff Right</option>
+                            <option value="shoulder-left">Shoulder Left</option>
+                            <option value="shoulder-right">Shoulder Right</option>
+                            <option value="left-arm">Left Arm</option>
+                            <option value="right-arm">Right Arm</option>
+                            <option value="finger-left">Finger Left</option>
+                            <option value="finger-right">Finger Right</option>
+                            <option value="left-hand">Left Hand</option>
+                            <option value="right-hand">Right Hand</option>
+                            <option value="lower-back">Lower Back</option>
+                            <option value="adductor-left">Adductor Left</option>
+                            <option value="adductor-right">Adductor Right</option>
+                            <option value="knee-left">Knee Left</option>
+                            <option value="knee-right">Knee Right</option>
+                            <option value="shin-left">Shin Left</option>
+                            <option value="shin-right">Shin Right</option>
+                            <option value="hamstring-left">Hamstring Left</option>
+                            <option value="hamstring-right">Hamstring Right</option>
+                            <option value="left-leg">Left Leg</option>
+                            <option value="right-leg">Right Leg</option>
+                            <option value="ankle-left">Ankle Left</option>
+                            <option value="ankle-right">Ankle Right</option>
+                            <option value="left-foot">Left Foot</option>
+                            <option value="right-foot">Right Foot</option>
+                        </select>
+                    <div class="body-container">
+                        <img id="body-diagram" src="{% static 'image.jpg' %}" alt="Body Diagram">
+                        <!-- Markers dynamically inserted here -->
+
+                    </div>
+
+            <button type="submit" class="submit-btn" style="margin-bottom:50px;">Submit</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const playerSelect = document.getElementById('id_player');
+    const detailsSection = document.getElementById('player-details-section');
+
+    playerSelect.addEventListener('change', function () {
+        const playerId = this.value;
+
+        if (!playerId) {
+            detailsSection.style.display = 'none';
+            return;
+        }
+
+        // Adjust this fetch URL if your ajax url has a prefix (e.g., '/player_app/ajax/get_player_info/')
+        fetch('/player_app/ajax/get_player_info/' + playerId + '/')
+        .then(resp => {
+            if (!resp.ok) throw new Error('Network response was not ok');
+            return resp.json();
+        })
+        .then(data => {
+            if (data.success) {
+                document.getElementById('p-name').textContent = data.player.name || '';
+                document.getElementById('p-gender').textContent = data.player.gender || '';
+                document.getElementById('p-age').textContent = data.player.age || '';
+                document.getElementById('p-email').textContent = data.player.email || '';
+                document.getElementById('p-role').textContent = data.player.role || '';
+                document.getElementById('p-bowling_style').textContent = data.player.bowling_style || '';
+                document.getElementById('p-id').textContent = data.player.player_id || '';
+                document.getElementById('p-dob').textContent = data.player.date_of_birth || '';
+                document.getElementById('p-contact').textContent = data.player.contact_number || '';
+                document.getElementById('p-handedness').textContent = data.player.handedness || '';
+                document.getElementById('p-batting_style').textContent = data.player.batting_style || '';
+                document.getElementById('p-district').textContent = data.player.district_cricket_association_id || '';
+                document.getElementById('p-photo').src = data.player.photo_url;
+                detailsSection.style.display = '';  // Show section
+            } else {
+                detailsSection.style.display = 'none';
+            }
+        })
+        .catch(err => {
+            console.error('Failed to fetch player info:', err);
+            detailsSection.style.display = 'none';
+        });
+    });
+
+    // Trigger update on page load if a player is already selected
+    if (playerSelect.value) {
+        playerSelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+  <script>
+    const bodyParts = {
+      "head":      {x: 75,  y: 35},
+      "neck":      {x: 75,  y: 55},
+      "chest":     {x: 75,  y: 85},
+      "obliques-left":  {x: 50,  y: 110},
+      "obliques-right": {x: 80, y: 110},
+      "lower-back":      {x: 235, y: 110},
+      "abdomen":   {x: 75,  y: 130},
+      "rotator-cuff-left":  {x: 30,  y:  60},
+      "rotator-cuff-right": {x: 100, y:  60},
+      "shoulder-left":  {x: 30,  y: 60},
+      "shoulder-right": {x: 100, y: 60},
+      "left-arm":  {x: 35,  y: 85},
+      "right-arm": {x: 115, y: 85},
+      "finger-left":  {x: 14,  y: 145},
+      "finger-right": {x: 125, y: 145},
+      "left-hand": {x: 15,  y: 145},
+      "right-hand":{x: 135, y: 145},
+      "knee-left": {x: 50,  y: 195},
+      "knee-right":{x: 78,  y: 195},
+      "shin-left": {x: 48,  y: 230},
+      "shin-right":{x: 80, y: 230},
+      "adductor-left": {x: 60, y: 180},
+      "adductor-right":{x: 70, y: 180},
+      "hamstring-left":  {x: 225,  y: 180},
+      "hamstring-right": {x: 250,  y: 180},
+      "left-leg":  {x: 60,  y: 215},
+      "right-leg": {x: 90,  y: 215},
+      "ankle-left": {x:  40,  y: 255},
+      "ankle-right":{x:  85,  y: 255},
+      "left-foot": {x: 45,  y: 260},
+      "right-foot":{x: 85,  y: 260},
+    };
+
+    const partSelect = document.getElementById('part-select');
+    const bodyContainer = document.querySelector('.body-container');
+
+    function updateMarkers() {
+      // Remove previous markers
+      const oldMarkers = document.querySelectorAll('.marker');
+      oldMarkers.forEach(marker => marker.remove());
+
+      // Get all selected options
+      const selected = Array.from(partSelect.selectedOptions).map(opt => opt.value);
+      selected.forEach(part => {
+        if (bodyParts[part]) {
+          const mk = document.createElement('div');
+          mk.className = 'marker';
+          mk.style.left = bodyParts[part].x + 'px';
+          mk.style.top = bodyParts[part].y + 'px';
+          bodyContainer.appendChild(mk);
+        }
+      });
+    }
+
+    partSelect.addEventListener('change', updateMarkers);
+  </script>
+
+  <script>
+  // wait until DOM is loaded
+  document.addEventListener('DOMContentLoaded', function () {
+    const unknownCheckbox = document.getElementById('{{ form.unknown_injury_date.id_for_label }}');
+    const expectedDateInput = document.getElementById('{{ form.expected_date_of_return.id_for_label }}');
+
+    if (unknownCheckbox && expectedDateInput) {
+      // toggle state initially
+      expectedDateInput.disabled = unknownCheckbox.checked;
+
+      // listen for checkbox change
+      unknownCheckbox.addEventListener('change', function () {
+        expectedDateInput.disabled = this.checked;
+        if (this.checked) {
+          expectedDateInput.value = ''; // optional: clear input
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}
