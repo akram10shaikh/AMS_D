@@ -85,15 +85,13 @@ WSGI_APPLICATION = 'ams.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'myprojectdb',
-        'USER': 'admin',
-        'PASSWORD': 'Pass@987#Pass#',
-        'HOST': 'localhost',
-        'PORT': '3306',
-    }
+    'default': dj_database_url.config(
+        default='sqlite:///db.sqlite3',  # fallback for local
+        conn_max_age=600,
+        ssl_require=False
+    )
 }
+
 #DATABASES['default'] = dj_database_url.parse("postgresql://ams_o84u_user:0YrcP7PeEJpplawc8g8lr3DwcsCk3tUL@dpg-d2iordbuibrs73a3gsbg-a/ams_o84u")
 
 
