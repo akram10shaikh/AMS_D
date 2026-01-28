@@ -92,6 +92,17 @@ DATABASES = {
     )
 }
 
+# DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.mysql',
+#        'NAME': 'myprojectdb',
+#        'USER': 'admin',
+#        'PASSWORD': 'Pass@987#Pass#',
+#        'HOST': 'localhost',
+#        'PORT': '3306',
+#    }
+# }
+
 #DATABASES['default'] = dj_database_url.parse("postgresql://ams_o84u_user:0YrcP7PeEJpplawc8g8lr3DwcsCk3tUL@dpg-d2iordbuibrs73a3gsbg-a/ams_o84u")
 
 
