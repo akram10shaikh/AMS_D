@@ -25,14 +25,14 @@ User = get_user_model()  # Use the CustomUser model if defined
 # Player model
 class Player(models.Model):
     Age_category_choices = [
-        ('boys under 16', 'Boys under 16'),
-        ('boys under 19', 'Boys under 19'),
-        ('men under 23', 'Men Under 23'),
-        ('men senior', 'Men Senior'),
-        ('girls under 15','Girls under 15'),
-        ('girls under 19','Girls under 19'),
-        ('women under 23','Women Under 23'),
-        ('women senior','Women Senior'),
+        ('boys_under_16', 'Boys under 16'),
+        ('boys_under_19', 'Boys under 19'),
+        ('men_under_23', 'Men Under 23'),
+        ('men_senior', 'Men Senior'),
+        ('girls_under_15','Girls under 15'),
+        ('girls_under_19','Girls under 19'),
+        ('women_under_23','Women Under 23'),
+        ('women_senior','Women Senior'),
 
     ]
     ROLE_CHOICES = [
@@ -187,15 +187,15 @@ class Player(models.Model):
         
         age = self.current_age
         if self.gender.lower() == 'male':
-            if age < 16: return 'boys under 16'
-            elif age <= 19: return 'boys under 19'
-            elif age < 23: return 'men under 23'
-            else: return 'men senior'
+            if age < 16: return 'boys_under_16'
+            elif age <= 19: return 'boys_under_19'
+            elif age < 23: return 'men_under_23'
+            else: return 'men_senior'
         else:  # female
-            if age < 15: return 'girls under 15'
-            elif age <= 19: return 'girls under 19'
-            elif age < 23: return 'women under 23'
-            else: return 'women senior'
+            if age < 15: return 'girls_under_15'
+            elif age <= 19: return 'girls_under_19'
+            elif age < 23: return 'women_under_23'
+            else: return 'women_senior'
 
     def __str__(self):
         return self.name
@@ -215,6 +215,7 @@ class CampTournament(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='camps_created')
     participants = models.ManyToManyField(Player, related_name="camps")
     is_deleted = models.BooleanField(default=False)
+    staff_members = models.ManyToManyField(Staff, related_name='camps', blank=True)  # New field for staff members
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -231,6 +232,8 @@ class CampActivity(models.Model):
         ('updated', 'Updated'),
         ('player_added', 'Player Added'),
         ('player_removed', 'Player Removed'),
+        ('staff_added', 'Staff Added'),      # NEW
+        ('staff_removed', 'Staff Removed'),  # NEW
         ('deleted', 'Deleted'),
         ('recovered', 'Recovered'),
     ]
@@ -240,6 +243,8 @@ class CampActivity(models.Model):
     performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
     details = models.TextField(blank=True)
+    player = models.ManyToManyField(Player, blank=True,null=True)
+    staff = models.ManyToManyField(Staff, blank=True,null=True)
 
     def __str__(self):
         return f"{self.camp.name} - {self.action} by {self.performed_by.username}"
@@ -370,13 +375,15 @@ class InjuryActivityLog(models.Model):
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     action = models.CharField(max_length=100,null=True)  # e.g., 'created', 'updated', 'added note'
     details = models.TextField(blank=True,null=True)     # More info about the action
-    created_at = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    phase = models.ForeignKey(CampTournament, on_delete=models.CASCADE, null=True, blank=True)
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, null=True, blank=True) 
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-timestamp']
 
     def __str__(self):
-        return f"{self.injury} - {self.action} at {self.created_at}"
+        return f"{self.injury} - {self.action} at {self.timestamp}"
     
 class PlayerActivityLog(models.Model):
     player = models.ForeignKey('Player', on_delete=models.CASCADE, related_name='activity_log')
@@ -394,7 +401,7 @@ class PlayerActivityLog(models.Model):
 
 class TreatmentRecommendation(models.Model):
     injury = models.ForeignKey(Injury, on_delete=models.CASCADE)
-    physio = models.ForeignKey(Staff, on_delete=models.CASCADE, limit_choices_to={'role': 'physio'})  # ✅ Link to Staff instead of separate model
+    physio = models.ForeignKey(Staff, on_delete=models.CASCADE, limit_choices_to={'role': 'physio'})  
     treatment = models.CharField(max_length=255, null=True, blank=True)
     recommendation_notes = models.TextField()
     recovery_time_weeks = models.IntegerField()
@@ -840,6 +847,17 @@ class DailyActivityCamps(models.Model):
     def __str__(self):
         return f"{self.log} - {self.activity_name}"
         
+class TestActivityLog(models.Model):
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='test_activity_logs')
+    subject = models.ForeignKey(Player, on_delete=models.CASCADE, related_name='test_activity_logs',null=True, blank=True)
+    activity_type = models.CharField(max_length=100, default='UPDATE',null=True, blank=True)  
+    timestamp = models.DateTimeField(auto_now_add=True)
+    details = models.TextField(blank=True, null=True)
+    phase = models.ForeignKey(CampTournament, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return f"Log: {self.activity_type} for {self.subject} by {self.actor} at {self.timestamp}"
+
     
 class SLGluteBridges(models.Model):
     player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name='sl_glute_bridges')
@@ -3827,6 +3845,7 @@ class RunA3x6Test(models.Model):
                 camp_agg.save(update_fields=['min', 'max', 'average'])
 
 
+
 class PlayerAttendance(models.Model):
     STATUS_CHOICES = [
         ('ST/RH', 'Strength / Rehab Session'),
@@ -3846,3 +3865,20 @@ class PlayerAttendance(models.Model):
 
     def __str__(self):
         return f"{self.player.name} - {self.camp.name} - {self.attendance_date} - {self.get_status_display()}"
+    
+
+
+class BowlerDrill(models.Model):
+    player = models.ForeignKey('Player', on_delete=models.CASCADE, related_name='bowler_drills')
+    camp = models.ForeignKey('CampTournament', on_delete=models.CASCADE, related_name='bowler_drills')
+    date = models.DateField()
+    no_balls = models.IntegerField()  # Number of balls bowled
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+        unique_together = ['player', 'camp', 'date'] 
+
+    def __str__(self):
+        return f"{self.player.name} {self.date}"
+    

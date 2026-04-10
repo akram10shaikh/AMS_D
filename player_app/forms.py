@@ -549,7 +549,6 @@ class TestSummaryFilterForm(forms.Form):
 
 from django.forms import modelformset_factory
 
-
 class PlayerAttendanceForm(forms.ModelForm):
     class Meta:
         model = PlayerAttendance

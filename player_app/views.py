@@ -1,3 +1,4 @@
+from cmath import phase
 import csv
 from socket import TCP_NODELAY
 
@@ -769,7 +770,7 @@ def activity_log_combined_view(request):
     medical_logs = MedicalActivityLog.objects.select_related('player', 'user', 'document').order_by('-timestamp')
 
     # Fetch all injury logs
-    injury_logs = InjuryActivityLog.objects.select_related('injury', 'actor').order_by('-created_at')
+    injury_logs = InjuryActivityLog.objects.select_related('injury', 'actor').order_by('-timestamp')
 
     # Fetch all player logs
     player_logs = PlayerActivityLog.objects.select_related('player', 'actor').order_by('-created_at')
@@ -836,6 +837,8 @@ def organization_create_injury(request):
                 injury=injury,
                 actor=request.user,
                 action='created',
+                player=injury.player,
+                phase=injury.camp_tournament,
                 details=f'Injury reported by {injury.reported_by} for player {injury.player}'
             )
             return redirect('organization_injury_list')  # Update to your desired redirect
@@ -1064,12 +1067,8 @@ def organization_injury_export(request):
 # Camps & Tournaments views
 def organization_camps_tournaments(request):
     """
-    Displays a list of camps/tournaments.
-    - Super Admins can view all camps.
-    - Staff can see camps based on their permissions.
-    - Users in an organization can see only camps from their organization.
+    Displays a list of camps/tournaments with player/staff counts on hover.
     """
-
     # Super Admin: Sees all camps
     if request.user.is_superuser:
         organizations = Organization.objects.all()
@@ -1093,7 +1092,7 @@ def organization_camps_tournaments(request):
 
     # Regular users: See only camps in their organization
     elif hasattr(request.user, 'organization') and request.user.organization:
-        org = request.user.organization  # Fixed: was request.user.staff.organization
+        org = request.user.organization
         camps = CampTournament.objects.filter(organization=org, is_deleted=False)
         male_players = Player.objects.filter(organization=org, gender='Male')
         female_players = Player.objects.filter(organization=org, gender='Female')
@@ -1107,6 +1106,18 @@ def organization_camps_tournaments(request):
         year=ExtractYear('start_date')
     ).order_by('-start_date')
 
+    # Pre-calculate participant and staff counts for each camp (for performance)
+    camp_stats = {}
+    for camp in camps_qs:
+        player_count = camp.participants.count()
+        staff_count = camp.staff_members.count()
+        
+        
+        camp_stats[camp.id] = {
+            'player_count': camp.participants.count(),
+            'staff_count': camp.staff_members.count()
+        }
+        
     # Group camps by year range (year to year+1)
     camps_by_range = defaultdict(list)
     for camp in camps_qs:
@@ -1117,57 +1128,156 @@ def organization_camps_tournaments(request):
     # Sort year ranges descending
     sorted_ranges = sorted(camps_by_range.items(), key=lambda x: int(x[0].split('-')[0]), reverse=True)
     
-    return render(request, 'player_app/organization/organization_camps_tournaments.html', {
+    context = {
         'camps': camps,
-        'camps_by_range': dict(sorted_ranges),  # Changed from camps_by_year
+        'camps_by_range': dict(sorted_ranges),
         'male_players': male_players,
         'female_players': female_players,
-        'organizations': organizations if request.user.is_superuser else None
+        'organizations': organizations if request.user.is_superuser else None,
+        'camp_stats': camp_stats  # Pass pre-calculated stats
+    }
+    
+    return render(request, 'player_app/organization/organization_camps_tournaments.html', context)
+
+
+def camp_stats(request, camp_id):
+    """
+    Returns player and staff counts for a specific camp (AJAX endpoint).
+    """
+    camp = get_object_or_404(CampTournament, id=camp_id, is_deleted=False)
+    
+    # Use exact model fields you provided
+    player_count = camp.participants.count()
+    staff_count = camp.staff_members.count()
+    
+    return JsonResponse({
+        'player_count': player_count,
+        'staff_count': staff_count,
     })
 
-
-
 def organization_edit_camp(request, camp_id):
-    """
-    Handles editing a specific camp/tournament, including participants.
-    """
     camp = get_object_or_404(CampTournament, id=camp_id)
+    
+    if not request.user.is_superuser and not (hasattr(request.user, "organization") and camp.organization == request.user.organization):
+        return HttpResponseForbidden("You don't have permission to edit this camp.")
+
+    staff = Staff.objects.filter(organization=camp.organization)
+    participants = Player.objects.filter(organization=camp.organization)
 
     if request.method == 'POST':
-        camp.name = request.POST.get('name')
-        camp.camp_type = request.POST.get('camp_type')
+        # === CLEAN OLD STATE ===
+        old_participant_ids = set(camp.participants.values_list('id', flat=True))
+        old_staff_ids = set()
+        staff_field_name = None
+        
+        for field_name in ['staff_members', 'coaches', 'staff']:
+            if hasattr(camp, field_name):
+                old_staff_ids = set(getattr(camp, field_name).values_list('id', flat=True))
+                staff_field_name = field_name
+                break
 
-        # Keep existing start date (only allow editing end date)
-        end_date = request.POST.get('end_date')
+        # === CLEAN NEW IDS (remove duplicates) ===
+        participant_ids_str = request.POST.get('participants', '')
+        raw_participant_ids = [id.strip() for id in participant_ids_str.split(',') if id.strip()]
+        new_participant_ids = list(set(int(id) for id in raw_participant_ids if id.isdigit()))  # UNIQUE IDs
+        
+        staff_ids_str = request.POST.get('selected_staff', '')
+        raw_staff_ids = [id.strip() for id in staff_ids_str.split(',') if id.strip()]
+        new_staff_ids = list(set(int(id) for id in raw_staff_ids if id.isdigit()))  # UNIQUE IDs
+
+        print(f"Clean new players: {new_participant_ids}")
+        print(f"Clean new staff: {new_staff_ids}")
+
+        # === UPDATE BASIC FIELDS ===
+        camp.name = request.POST.get('name', '')
+        camp.camp_type = request.POST.get('camp_type', '')
+        end_date = request.POST.get('end_date', '')
         if end_date:
             camp.end_date = end_date
-
-        camp.venue = request.POST.get('venue')
-
-        # Update participants (only from the same organization)
-        participant_ids = request.POST.getlist('participants')
-        camp.participants.set(participant_ids)
-
+        camp.venue = request.POST.get('venue', '')
         camp.save()
 
-        # Log the update activity
-        CampActivity.objects.create(
-            camp=camp,
-            action='updated',
-            performed_by=request.user,
-            details=f"Camp/Tournament '{camp.name}' was updated."
-        )
+        # === PERFECT CHANGE DETECTION ===
+        added_players = set(new_participant_ids) - old_participant_ids
+        removed_players = old_participant_ids - set(new_participant_ids)
+        added_staff = set(new_staff_ids) - old_staff_ids
+        removed_staff = old_staff_ids - set(new_staff_ids)
 
-        messages.success(request, "Camp/Tournament updated successfully!")
+        print(f"✅ Added players: {added_players}")
+        print(f"❌ Removed players: {removed_players}")
+        print(f"✅ Added staff: {added_staff}")
+        print(f"❌ Removed staff: {removed_staff}")
+
+        # === APPLY CHANGES ===
+        camp.participants.set(participants.filter(id__in=new_participant_ids))
+        if staff_field_name:
+            getattr(camp, staff_field_name).set(staff.filter(id__in=new_staff_ids))
+
+        # === SINGLE LOG WITH ONLY ACTUAL CHANGES ===
+        changes = []
+        changed_players = []
+        changed_staff = []
+
+        # Added players ONLY
+        if added_players:
+            added_objs = participants.filter(id__in=added_players)
+            names = ', '.join(obj.name for obj in added_objs)
+            changes.append(f"Added players: {names}")
+            changed_players.extend(added_objs)
+
+        # Removed players ONLY
+        if removed_players:
+            removed_objs = participants.filter(id__in=removed_players)
+            names = ', '.join(obj.name for obj in removed_objs)
+            changes.append(f"Removed players: {names}")
+            changed_players.extend(removed_objs)
+
+        # Added staff ONLY
+        if added_staff:
+            added_objs = staff.filter(id__in=added_staff)
+            names = ', '.join(f"{obj.name} ({obj.staff_role})" for obj in added_objs)
+            changes.append(f"Added staff: {names}")
+            changed_staff.extend(added_objs)
+
+        # Removed staff ONLY
+        if removed_staff:
+            removed_objs = staff.filter(id__in=removed_staff)
+            names = ', '.join(f"{obj.name} ({obj.staff_role})" for obj in removed_objs)
+            changes.append(f"Removed staff: {names}")
+            changed_staff.extend(removed_objs)
+
+        # CREATE SINGLE LOG
+        if changes:
+            activity = CampActivity.objects.create(
+                camp=camp,
+                action='updated',
+                performed_by=request.user,
+                details='; '.join(changes)
+            )
+            
+            if changed_players:
+                activity.player.set(changed_players)
+            if changed_staff:
+                activity.staff.set(changed_staff)
+
+        # Success message
+        msg_parts = []
+        if added_players: msg_parts.append(f"✅ +{len(added_players)} players")
+        if removed_players: msg_parts.append(f"❌ -{len(removed_players)} players")
+        if added_staff: msg_parts.append(f"✅ +{len(added_staff)} staff")
+        if removed_staff: msg_parts.append(f"❌ -{len(removed_staff)} staff")
+        
+        messages.success(request, f"Updated! {' | '.join(msg_parts)}")
+
         return redirect('organization_camp_detail', camp_id=camp.id)
-
-    # Get only players from the same organization
-    participants = Player.objects.filter(organization=camp.organization)
 
     return render(request, 'player_app/organization/organization_edit_camp.html', {
         'camp': camp,
-        'participants': participants
+        'participants': participants,
+        'staff': staff,
     })
+
+
 
 @login_required
 def organization_create_camp(request):
@@ -1180,56 +1290,65 @@ def organization_create_camp(request):
     # Super Admin: Get all organizations
     if request.user.is_superuser:
         organizations = Organization.objects.all()
-        players = Player.objects.all()  # Super Admins can see all players
+        players = Player.objects.all()
 
-    # Organization Admins: Check if user has an organization directly
+    # Organization Admins
     elif hasattr(request.user, "organization") and request.user.organization:
         organization = request.user.organization
         players = Player.objects.filter(organization=organization)
 
-    # Staff Members: Ensure they have a staff profile before accessing
+    # Staff Members
     elif hasattr(request.user, "staff") and request.user.staff:
         organization = request.user.staff.organization
         players = Player.objects.filter(organization=organization)
 
     else:
         return HttpResponseForbidden(
-            "You must be a Super Admin, Organization Admin, or a Staff member to create a camp.")
+            "You must be a Super Admin, Organization Admin, or a Staff member to create a camp."
+        )
 
-    players_grouped = {'M': {}, 'F': {}}
+    # Group players by gender (M/F) and age_category
+    players_grouped = {"M": {}, "F": {}}
     for player in players:
-        gender = player.gender
-        age_cat = player.age_category
-        if gender in ['M', 'F']:
-            if age_cat not in players_grouped[gender]:
-                players_grouped[gender][age_cat] = []
-            players_grouped[gender][age_cat].append({'id': player.id, 'name': player.name})
+        # Convert "Male"/"Female" to "M"/"F"
+        if player.gender == "Male":
+            gender = "M"
+        elif player.gender == "Female":
+            gender = "F"
+        else:
+            continue  # skip "Other" or invalid
 
-    players_grouped_json = json.dumps(players_grouped)
+        age_cat = player.age_category  # e.g., 'boys_under_16'
+
+        if age_cat not in players_grouped[gender]:
+            players_grouped[gender][age_cat] = []
+
+        players_grouped[gender][age_cat].append({"id": player.id, "name": player.name})
+
+    import json
+
+    players_grouped_json = json.dumps(players_grouped, ensure_ascii=False)
 
     if request.method == "POST":
         name = request.POST.get("name")
         camp_type = request.POST.get("camp_type")
         start_date = request.POST.get("start_date")
-        gender = request.POST.get("gender")
+        gender = request.POST.get("gender_type")
         age_category = request.POST.get("age_category")
         venue = request.POST.get("venue")
 
-
-        # Super Admin: Allow selecting an organization
+        # Resolve organization
         if request.user.is_superuser:
             organization_id = request.POST.get("organization")
             organization = get_object_or_404(Organization, id=organization_id)
         elif hasattr(request.user, "organization") and request.user.organization:
-            # Organization Admins: Auto-set organization
             organization = request.user.organization
         elif hasattr(request.user, "staff") and request.user.staff:
-            # Staff: Auto-set organization from staff profile
             organization = request.user.staff.organization
         else:
             return HttpResponseForbidden("You do not have permission to create a camp.")
 
-        # Create the camp/tournament
+        # Create camp
         camp = CampTournament.objects.create(
             name=name,
             camp_type=camp_type,
@@ -1238,22 +1357,110 @@ def organization_create_camp(request):
             age_category=age_category,
             venue=venue,
             organization=organization,
-            created_by=request.user
+            created_by=request.user,
         )
 
-        # Add participants (Only players from the same organization)
-        selected_participants = request.POST.getlist("participants")
-        valid_participants = players.filter(id__in=selected_participants)  # Ensure only valid participants
-        camp.participants.set(valid_participants)
+        #  Handle STAFF (comma-separated IDs from template)
+        selected_staff_ids = request.POST.get("selected_staff", "").split(",")
+       
+        valid_staff_ids = [id for id in selected_staff_ids if id.isdigit()]
 
-        messages.success(request, "Camp/Tournament created successfully!")
-        return redirect("organization_camps_tournaments")  # Redirect after creation
-    
-    return render(request, "player_app/organization/organization_create_camp.html", {
-        "organizations": organizations,  # Super Admin can select
-        "players": players,    # Filtered players for the user
-        "players_grouped_json": players_grouped_json,
-    })
+        #  Handle PLAYERS (comma-separated IDs from template)
+        selected_player_ids = request.POST.get("participants", "").split(",")
+        valid_player_ids = [id for id in selected_player_ids if id.isdigit()]
+       
+        #  PLAYERS - assign to camp.participants
+        if valid_player_ids:
+            valid_participants = players.filter(id__in=valid_player_ids)
+            camp.participants.set(valid_participants)
+            print(f" Assigned {valid_participants.count()} players to camp")
+        else:
+            print("ℹ No players selected")
+
+       
+        staff_assigned = False
+        if valid_staff_ids:
+            try:
+                # Filter staff by organization only
+                valid_staff = Staff.objects.filter(
+                    id__in=valid_staff_ids,
+                    organization=organization
+                )
+                
+                # Role breakdown for logging
+                role_counts = {}
+                ROLE_CHOICES = [
+                    ('selector', 'Selector'),
+                    ('sc_coach', 'S&C Coach'),
+                    ('physio', 'Physio'),
+                    ('support_staff', 'Support Staff'),
+                    ('other_coach', 'Other Coach'),
+                ]
+                
+                for staff in valid_staff:
+                    role_key = getattr(staff, 'role', 'unknown')
+                    role_counts[role_key] = role_counts.get(role_key, 0) + 1
+                
+                print(f" Staff roles selected: {role_counts}")
+
+                # Try different possible M2M field names on CampTournament
+                possible_staff_fields = ['staff_members', 'coaches', 'staff', 'support_staff']
+                for field_name in possible_staff_fields:
+                    if hasattr(camp, field_name):
+                        getattr(camp, field_name).set(valid_staff)
+                        print(f" Assigned {valid_staff.count()} staff to camp.{field_name}")
+                        staff_assigned = True
+                        break
+                
+                if not staff_assigned:
+                    print(f"  No staff M2M field found. Available fields: {[f.name for f in camp._meta.many_to_many]}")
+                    
+            except Exception as e:
+                print(f" Staff assignment error: {e}")
+
+        # Success message with role breakdown
+        player_count = len(valid_player_ids)
+        staff_count = len(valid_staff_ids)
+        
+        success_msg = f" Camp '{name}' created successfully!"
+        if player_count > 0:
+            success_msg += f"<br>• {player_count} player(s)"
+        if staff_count > 0:
+            success_msg += f"<br>• {staff_count} staff member(s)"
+        
+     
+        valid_palyers = Player.objects.filter(id__in=valid_player_ids)
+       
+        staff_qs = Staff.objects.filter(id__in=valid_staff_ids)
+        
+        act = CampActivity.objects.create(
+            camp=camp,
+            action='Added',
+            performed_by=request.user,
+           
+            details=f"Created '{camp.name}' - {player_count} participants, {staff_count} staff"
+        )
+        act.player.set(valid_participants)
+        act.staff.set(staff_qs)
+        act.save()
+       
+        messages.success(request, success_msg)
+        return redirect("organization_camps_tournaments")   
+
+    staff_members = Staff.objects.filter(organization=organization)  # or all()
+    staff_list = [{"id": s.id, "name": f"{s.name}".strip(),"role":s.staff_role} for s in staff_members]
+    staff_json = json.dumps(staff_list, ensure_ascii=False)
+      # Debug print to verify staff data is correct
+
+    return render(
+        request,
+        "player_app/organization/organization_create_camp.html",
+        {
+            "organizations": organizations,
+            "players_grouped_json": players_grouped_json,
+            "staff_json": staff_json,
+        },
+    )
 
 def organization_delete_camp(request, camp_id):
     """
@@ -1274,11 +1481,21 @@ def organization_delete_camp(request, camp_id):
 
 def organization_camp_detail(request, camp_id):
     """
-    Displays details of a specific camp/tournament with S&C Logs, Injuries, and Tests.
+    Displays details of a specific camp/tournament with S&C Logs, Injuries, Tests, and TestActivityLog.
     """
     camp = get_object_or_404(CampTournament, id=camp_id)
     phase = get_object_or_404(CampTournament, id=camp_id, 
                               organization=request.user.organization)
+    
+    # 🔥 TestActivityLog - Fixed field names with optimization
+    test_activity_logs = TestActivityLog.objects.filter(
+        phase=phase
+    ).select_related(
+        'subject',      #  Player field (not 'player')
+        'actor'         #  User field
+    ).order_by('-timestamp')[:50]  # Most recent first
+    
+    test = test_activity_logs  # Keep existing reference if needed elsewhere
     
     # Dict of all test querysets by phase
     test_data = {
@@ -1320,7 +1537,7 @@ def organization_camp_detail(request, camp_id):
         for obj in qs:
             row_dict = obj_to_row(obj)
             
-            # ✅ Fix player name display (handles both player/player_id)
+            # Fix player name display (handles both player/player_id)
             if 'player_id' in row_dict:
                 row_dict['player_id'] = obj.player.name if obj.player else 'Unknown Player'
             elif 'player' in row_dict:
@@ -1335,19 +1552,27 @@ def organization_camp_detail(request, camp_id):
             "rows": rows,
         }
 
-    # 🔥 NEW: S&C Logs (TOP section) - Optimized with prefetch_related for activities
+    # 🔥 S&C Logs (TOP section) - Optimized with prefetch_related for activities
     snc_logs = DailySncLogCamps.objects.filter(team=phase).prefetch_related('activities')[:10]
+    camp_activities = CampActivity.objects.filter(camp=phase).order_by('-timestamp')
+    injury_activities = InjuryActivityLog.objects.filter(phase=phase).order_by('-timestamp')
 
-    # 🔥 NEW: Injuries (MIDDLE section) - Optimized
+    all_activities = list(camp_activities) + list(test_activity_logs) + list(injury_activities)
+    all_activities.sort(key=lambda x: x.timestamp, reverse=True)
+    
+    # Injuries (MIDDLE section) - Optimized
     camp_injuries = Injury.objects.filter(
         camp_tournament=phase,
         player__organization=request.user.organization
     ).select_related('player').order_by('-injury_date')[:10]
 
     context = {
+        'all_activities': all_activities,
         'snc_logs': snc_logs,
         'camp_injuries': camp_injuries,
         "phase": phase,
+        "test_activity_logs": test_activity_logs, 
+        "test": test,
         "test_data": test_data,
         "total_tests": sum(len(tests) for tests in test_data.values()),
         "all_empty": all_empty,
@@ -1356,6 +1581,7 @@ def organization_camp_detail(request, camp_id):
         'camp': camp,
     }
     return render(request, 'player_app/organization/organization_camp_detail.html', context)
+
 
 
 
@@ -1857,104 +2083,61 @@ def player_wellness_report(request):
     
     return render(request, 'player_app/camps/player-wellness-report.html', context)
 
-
+def player_wellness_report_data(request):
+    user_org = getattr(request.user, "organization", None)
+    players = Player.objects.filter(organization=user_org).order_by('name')
+    
+    report_data = None
+    selected_player = None
+    start_date = None
+    end_date = None
+    chart_data = None
+    
+    if request.method == 'POST':
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+        player_id = request.POST.get('player_id')
+        
+        start_parsed = parser.parse(start_date).date()
+        end_parsed = parser.parse(end_date).date()
+        selected_player = get_object_or_404(Player, id=player_id)
+        
+        # Query your DailyWellnessTest model
+        report_data = DailyWellnessTest.objects.filter(
+            player=selected_player,
+            date__range=[start_parsed, end_parsed]
+        ).order_by('date')
+        
+        # ✅ CHART DATA - EXACTLY what JavaScript needs
+        chart_data = {
+            'dates': [log.date.strftime('%b %d') for log in report_data],
+            'soreness': [int(log.soreness_level or 0) for log in report_data],
+            'fatigue': [int(log.fatigue_level or 0) for log in report_data],
+            'sleep': [float(log.sleep_hours or 0) for log in report_data],
+            'motivation': [int(log.motivation_level or 0) for log in report_data],
+            'rpe': [int(log.total_rpe or 0) for log in report_data],
+            'balls': [int(log.balls_bowled or 0) for log in report_data],
+            'pain_count': sum(1 for log in report_data if log.has_pain),
+            'total_days': len(report_data),
+            'training_types': [item for log in report_data for item in (log.training_session_types or [])],
+        }
+    
+    context = {
+        'players': players,
+        'report_data': report_data,
+        'selected_player': selected_player,
+        'start_date': start_date,
+        'end_date': end_date,
+        'chart_data': chart_data,
+    }
+    return render(request, 'player_app/camps/player-wellness-report-data.html', context)
 
 # -----------------------------------------------------------------------------------------------------------
 
 from django.db.models import Avg
 from django.db.models import Min, Max
 from collections import defaultdict
-# @login_required
-# def test_dashboard(request):
-#     # Get user's organization (adjust as per your user model)
-#     user_organization = getattr(request.user, 'organization', None)
-#     if not user_organization:
-#         return render(request, 'player_app/organization/test_dashboard.html', {
-#             'error_message': "Your account is not linked to any organization.",
-#         })
 
-#     # Get players in user's organization
-#     players_in_org = Player.objects.filter(organization=user_organization)
-
-#     # Handle new test result form (restrict player queryset to org players)
-#     if request.method == 'POST':
-#         add_form = TestAndResultForm(request.POST)
-#         add_form.fields['player'].queryset = players_in_org
-#         if add_form.is_valid():
-#             add_form.save()
-#             return redirect('test_dashboard')
-#     else:
-#         add_form = TestAndResultForm()
-#         add_form.fields['player'].queryset = players_in_org
-
-#     # Handle filter form (restrict player queryset to org players)
-#     filter_form = TestSummaryFilterForm(request.GET or None)
-#     filter_form.fields['player'].queryset = players_in_org
-
-#     # Base queryset filtered by org players only
-#     qs = TestAndResult.objects.select_related('player').filter(player__in=players_in_org).order_by('player__name', 'test', 'date', 'id')
-
-#     # Apply filters if valid form submitted
-#     if filter_form.is_valid():
-#         if filter_form.cleaned_data.get('player'):
-#             qs = qs.filter(player=filter_form.cleaned_data['player'])
-#         if filter_form.cleaned_data.get('test'):
-#             qs = qs.filter(test=filter_form.cleaned_data['test'])
-
-#     # Group trials by (player_id, test)
-#     player_test_trials = defaultdict(list)
-#     for trial in qs:
-#         key = (trial.player.id, trial.test)
-#         player_test_trials[key].append(trial)
-
-#     # Build summary rows without serial yet
-#     summary_rows = []
-#     for (player_id, test), trials in player_test_trials.items():
-#         if not trials:
-#             continue
-
-#         # Last two trials chronologically
-#         last_two_trials = trials[-2:] if len(trials) >= 2 else trials[-1:]
-
-#         trial_1 = last_two_trials[0].trial if len(last_two_trials) == 2 else None
-#         trial_2 = last_two_trials[-1].trial
-
-#         best_trial = min(t.trial for t in trials)
-
-#         last_trial_obj = last_two_trials[-1]
-#         # Individual Average: mean of all trials for this player and test
-        
-#         indv_average = sum(t.trial for t in trials) / len(trials) if trials else None
-#         group_average = TestAndResult.objects.filter(test=test).aggregate(Avg('trial'))['trial__avg']
-        
-#         summary_rows.append({
-#             'player_name': last_trial_obj.player.name,
-#             'test': test,
-#             'last_date': last_trial_obj.date,
-#             'last_phase': last_trial_obj.phase,
-#             'trial_1': trial_1,
-#             'trial_2': trial_2,
-#             'best_trial': best_trial,
-#             'indv_average': indv_average,
-#             'group_average': group_average,
-#         })
-
-#     # Group rows by test
-#     summary_by_test = defaultdict(list)
-#     for row in summary_rows:
-#         summary_by_test[row['test']].append(row)
-
-#     # Assign serial numbers per test table starting at 1
-#     for test_name, rows in summary_by_test.items():
-#         for idx, row in enumerate(rows, start=1):
-#             row['serial'] = idx
-
-#     context = {
-#         'add_form': add_form,
-#         'form': filter_form,
-#         'summary_by_test': dict(summary_by_test),
-#     }
-#     return render(request, 'player_app/organization/test_dashboard.html', context)
 
 @login_required
 def add_test_result(request):
@@ -2008,40 +2191,44 @@ def organization_dashboard_org(request):
     all_players = Player.objects.filter(organization=organization)
     all_injuries = Injury.objects.filter(player__organization=organization)
 
-    # ✅ NEW: Build category_players for tooltips
-    category_players = defaultdict(list)
-    for player in all_players:
-        category_players[player.age_category].append(player.name)
-    category_players = dict(category_players)
-
+   
     # Cards definitions - FIXED keys match age_category values
     CATEGORY_CARDS = OrderedDict([
-        ("boys_under-15", {'gender': 'M', 'label': "B - U14"}),
-        ("boys_under-16", {'gender': 'M', 'label': "B - U16"}),
-        ("boys_under-19", {'gender': 'M', 'label': "B - U19"}),
-        ("men_under-23",  {'gender': 'M', 'label': "B - U23"}),
-        ("men_senior",    {'gender': 'M', 'label': "M - SENIOR"}),
-        ("girls_under-15", {'gender': 'F', 'label': "G - U15"}),
-        ("girls_under-19", {'gender': 'F', 'label': "G - U19"}),
-        ("women_under-23", {'gender': 'F', 'label': "W - U23"}),
-        ("women_senior",  {'gender': 'F', 'label': "W - SENIOR"}),
+        ("boys_under_15", {'gender': 'Male', 'label': "B - U14"}),
+        ("boys_under_16", {'gender': 'Male', 'label': "B - U16"}),
+        ("boys_under_19", {'gender': 'Male', 'label': "B - U19"}),
+        ("men_under_23",  {'gender': 'Male', 'label': "B - U23"}),
+        ("men_senior",    {'gender': 'Male', 'label': "M - SENIOR"}),
+        ("girls_under_15", {'gender': 'Female', 'label': "G - U15"}),
+        ("girls_under_19", {'gender': 'Female', 'label': "G - U19"}),
+        ("women_under_23", {'gender': 'Female', 'label': "W - U23"}),
+        ("women_senior",  {'gender': 'Female', 'label': "W - SENIOR"}),
     ])
 
+
     category_cards = []
+    
     for age_category, card_cat in CATEGORY_CARDS.items():
         players_qs = all_players.filter(
-            gender=card_cat['gender'],
+            gender__iexact=card_cat['gender'],  # Add __iexact
             age_category=age_category
         ).distinct()
+        full = players_qs.filter(player_status__iexact="full participation")
+        limited = players_qs.filter(player_status__iexact="limited participation")
+        none = players_qs.filter(player_status__iexact="no participation")
 
         category_cards.append({
             'label': card_cat['label'],
-            'age_category': age_category,  # ✅ CRITICAL for data-age-category
+            'age_category': age_category,  # CRITICAL for data-age-category
             'total': players_qs.count(),
-            'full': players_qs.filter(player_status__iexact="full participation").count(),
-            'limited': players_qs.filter(player_status__iexact="limited participation").count(),
-            'none': players_qs.filter(player_status__iexact="no participation").count(),
+            'full': full.count(),
+            'limited': limited.count(),
+            'none': none.count(),
             'active_injury': all_injuries.filter(player__in=players_qs, status='open').values('player_id').distinct().count(),
+
+            'full_names': ", ".join(full.values_list('name', flat=True)) or "No players",
+            'limited_names': ", ".join(limited.values_list('name', flat=True)) or "No players",
+            'none_names': ", ".join(none.values_list('name', flat=True)) or "No players",
         })
 
     # Filtered data for tables
@@ -2072,25 +2259,40 @@ def organization_dashboard_org(request):
     players = players.prefetch_related('injuries__reported_by', 'camps')
 
     # Activity logs
-    medical_logs = MedicalActivityLog.objects.filter(player__in=players).select_related('player', 'user', 'document')
-    injury_logs = InjuryActivityLog.objects.filter(injury__in=injuries).select_related('injury', 'actor')
-    player_logs = PlayerActivityLog.objects.filter(player__in=players).select_related('player', 'actor')
-    
-    for log in chain(medical_logs, injury_logs, player_logs):
+    medical_logs = MedicalActivityLog.objects.filter(player__in=players).select_related('player', 'user', 'document').order_by('-timestamp')
+    injury_logs = InjuryActivityLog.objects.filter(injury__in=injuries).select_related('injury', 'actor').order_by('-timestamp')
+    player_logs = PlayerActivityLog.objects.filter(player__in=players).select_related('player', 'actor').order_by('-created_at')
+    test_logs = TestActivityLog.objects.filter(subject__in=players).select_related('actor', 'subject', 'phase').order_by('-timestamp')
+    camp_logs = CampActivity.objects.filter(camp__participants__in=players).select_related('camp', 'performed_by').order_by('-timestamp')    
+  
+
+    # Assign log_type first (iterate querysets only)
+    for log in chain(medical_logs, injury_logs, player_logs, test_logs, camp_logs):
         if hasattr(log, 'log_type'):
             continue
         if 'MedicalActivityLog' in str(type(log)):
             log.log_type = 'medical'
         elif 'InjuryActivityLog' in str(type(log)):
             log.log_type = 'injury'
+        elif 'TestActivityLog' in str(type(log)):  # This now works
+            log.log_type = 'test'
+        elif 'CampActivity' in str(type(log)):   # This now works
+            log.log_type = 'camp'
+
         else:
             log.log_type = 'player'
 
-    combined_logs = sorted(
-        chain(medical_logs, injury_logs, player_logs),
-        key=lambda log: getattr(log, 'timestamp', getattr(log, 'created_at', None)) or datetime.min,
+    # Now chain, sort, convert to list, and paginate
+    all_logs = sorted(
+        chain(medical_logs, injury_logs, player_logs, test_logs, camp_logs),
+        key=lambda log: getattr(log, 'timestamp', getattr(log, 'created_at', datetime.min)),
         reverse=True
     )
+
+    paginator = Paginator(all_logs, 20)  # 20 logs per page; adjust as needed
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
 
     camps_qs = (
         CampTournament.objects.filter(participants__in=players)
@@ -2126,6 +2328,7 @@ def organization_dashboard_org(request):
         
 
 
+
     context = {
         'selected_category': selected_category,
         'selected_gender': selected_gender,
@@ -2135,9 +2338,11 @@ def organization_dashboard_org(request):
         'active_injuries_count': active_injuries_count,
         'active_injuries': active_injuries,
         'participation_counts': participation_counts,
-        'activity_logs': combined_logs,
+        'activity_logs': page_obj,
         'category_cards': category_cards,
-        'category_players': category_players, 
+        'total_logs':paginator.count,
+        
+      
         'camps_by_year': camps_by_year_range,
     }
     return render(request, 'player_app/organization/organization_dashboard.html', context)
@@ -2195,14 +2400,14 @@ def players_by_category(request):
 
     # Category labels for display
     category_labels = {
-        'boys_under-15': 'Boys U14',
-        'boys_under-16': 'Boys U16', 
-        'boys_under-19': 'Boys U19',
-        'men_under-23': 'Men U23',
+        'boys_under_15': 'Boys U14',
+        'boys_under_16': 'Boys U16', 
+        'boys_under_19': 'Boys U19',
+        'men_under_23': 'Men U23',
         'men_senior': 'Men Senior',
-        'girls_under-15': 'Girls U15',
-        'girls_under-19': 'Girls U19',
-        'women_under-23': 'Women U23',
+        'girls_under_15': 'Girls U15',
+        'girls_under_19': 'Girls U19',
+        'women_under_23': 'Women U23',
         'women_senior': 'Women Senior',
     }
     
@@ -3672,6 +3877,29 @@ def test_dashboard_new(request):
         del request.session['phase_id_test']
     return render(request, 'player_app/organization/organization_main_test_dash.html')
 
+from django.db.models import Q
+def test_activity_logs(request):
+    queryset = TestActivityLog.objects.select_related('actor', 'subject', 'phase').order_by('-timestamp')
+    
+    # Search handling
+    query = request.GET.get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(actor__username__icontains=query) | 
+            Q(subject__name__icontains=query)  # Adjust 'name' to your Player model's field [web:11][web:14]
+        )
+    
+    # Pagination
+    paginator = Paginator(queryset, 10)  # 10 items per page [web:1]
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'logs': page_obj,
+        'request': request  # For preserving search in template
+    }
+    return render(request, 'player_app/tests/test_activity_logs.html', context) 
+
 from django.core.paginator import Paginator
 from django.db.models import Q
 
@@ -3853,6 +4081,14 @@ def add_run_3x6_test(request):
                 reported_by=reported_by,
             
             )
+
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_data,
+                actor=reported_by,
+                activity_type='Test Added',
+                details=f'Added Run A 3x6 test with average {run_a_3x6_average}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
 
@@ -3950,9 +4186,19 @@ def add_glute_bridges_test(request):
                 notes=notes,
                 reported_by=reported_by
             )
+            
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_data,
+                actor=reported_by,
+                activity_type='Test Added',
+                details=f'Added S/L Glute Bridges test with Right: {sl_right}, Left: {sl_left}'
+            )
+
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
  
+           
             return redirect('test_dashboard_new')
         # Pass errors back to template if any
         else:
@@ -4098,6 +4344,13 @@ def add_lunge_calf_raises_test(request):
                 notes=notes,
                 reported_by=reported_by_user,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added S/L Lunge Calf Raises test with Right: {right_val}, Left: {left_val}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
 
@@ -4216,6 +4469,13 @@ def add_mb_rotational_throw_test(request):
                 notes=notes,
                 reported_by=reported_by_user,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added MB Rotational Throws test with Right: {right_val}, Left: {left_val}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
 
@@ -4332,6 +4592,13 @@ def add_copen_hagen_test(request):
                 notes=notes,
                 reported_by=reported_by_user,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added Copenhagen test with Right: {right_val}, Left: {left_val}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
 
@@ -4443,6 +4710,13 @@ def add_sl_hop_test(request):
                 left=left_val,
                 notes=notes,
                 reported_by=reported_by_user,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added S/L Hop test with Right: {right_val}, Left: {left_val}'
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -4624,6 +4898,13 @@ def add_cmj_scores_test(request):
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added CMJ Scores test with Jump Height: {jh_val}, Reactive Strength Index: {rsi_val}'
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -4853,6 +5134,13 @@ def add_anthropometry_test(request):
                 notes=notes,
                 reported_by=reported_by_user,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added Anthropometry test with Height: {height_val}, Weight: {weight_val}, Fat%: {fat_percent_val}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
 
@@ -5015,7 +5303,13 @@ def add_dexa_scan_test(request):
                 notes=notes,
                 reported_by=reported_by_user,
             )
-            
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added DEXA Scan test with BMI: {bmi_val}, Total Fat: {total_fat_val}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
             return redirect('test_dashboard_new')
@@ -5230,6 +5524,13 @@ def add_blood_test(request):
                 notes=notes,
                 reported_by=reported_by_user,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added Blood Work test with Hemoglobin: {hb_val}, Cholesterol: {chol_val}, Vitamin D3: {vit_d3_val}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
             return redirect('test_dashboard_new')
@@ -5341,6 +5642,13 @@ def add_runa3_test(request):
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added Run A 3 test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -5480,6 +5788,13 @@ def add_forty_meter_test(request):
                 gender=player.gender,
                 category=player.age_category,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added 40m test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))           
             return redirect('forty_meter_test_view')
@@ -5616,6 +5931,13 @@ def add_twenty_meter_test(request):
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added 20m test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -5758,6 +6080,13 @@ def add_ten_meter_test(request):
                 gender=player.gender,
                 category=player.age_category,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added 10m test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'   
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
             return redirect('ten_meter_test_view')
@@ -5892,6 +6221,13 @@ def add_sbj_test(request):
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added SBJ test with Best: {best_val}'
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -6036,6 +6372,13 @@ def add_yoyo_test(request):
                 gender=player.gender,
                 category=player.age_category,
             )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details =f'Added YoYo Test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
             return redirect('yoyo_test_view')
@@ -6178,6 +6521,13 @@ def add_one_mile_test(request):
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added 1 Mile test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -6322,7 +6672,13 @@ def add_two_km_test(request):
                 gender=player.gender,
                 category=player.age_category,
             )
-
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added 2 KM test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'
+            )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
             return redirect('two_km_test_view')
@@ -6453,6 +6809,13 @@ def add_pushups_test(request):
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=reported_by_user,
+                activity_type='Test Added',
+                details=f'Added Push-ups test with Best: {best_val}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -6688,6 +7051,13 @@ def add_msk_injury_assessment(request):
                 phase=phase_obj,
                 comments=comments,
                 
+            )
+            TestActivityLog.objects.create(
+                subject=player,
+                phase=phase_obj,
+                actor=request.user,
+                activity_type='Test Added',
+                details=f'Added MSK Injury Assessment by {physiotherapist_name}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -7045,7 +7415,22 @@ def player_test_select(request):
         'players': players,
     })
 
+def individual_player_report(request,test_name):
+    if test_name == 'SL Glute Bridges':
+        test_name = "S/L Glute Bridges"
+    if test_name == "SL Hop":
+        test_name = "S/L Hop"
+    user_organization = getattr(request.user, 'organization', None)
+    players = Player.objects.filter(organization=user_organization)
 
+    if request.method == 'POST':
+        player_id = request.POST.get('player')
+        return redirect('player_test', player_id=player_id)
+
+    return render(request, 'player_app/record/individual_test_report.html', {
+        'players': players,
+        'test_name':test_name,
+    })
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -8280,6 +8665,7 @@ def multitest(request):
     return render(request,'player_app/record/multi_test_report.html',context)
 
 
+
 @login_required
 def camp_attendance_view(request, camp_id):
     """
@@ -8335,6 +8721,189 @@ def camp_attendance_view(request, camp_id):
     }
     return render(request, 'player_app/camps/camp_attendance.html', context)
 
+def camp_attendance_work(request):
+    camps = CampTournament.objects.filter(
+        organization=getattr(request.user, "organization", None)
+    ).order_by('name')
+    
+    # ✅ AJAX: Load players
+    if request.method == 'POST' and request.POST.get('action') == 'load_players':
+        camp_id = request.POST.get('camp_id')
+        date_str = request.POST.get('date')
+        
+        if camp_id and date_str:
+            try:
+                camp = CampTournament.objects.get(id=camp_id)
+                participants = camp.participants.all()
+                
+                # Existing attendance
+                existing = PlayerAttendance.objects.filter(
+                    camp=camp, attendance_date=date_str
+                ).values_list('player_id', 'status')
+                attendance_dict = dict(existing)
+                
+                players_data = []
+                for player in participants:
+                    players_data.append({
+                        'id': player.id,
+                        'name': player.name,
+                        'existing_status': attendance_dict.get(player.id, '')
+                    })
+                
+                return JsonResponse({
+                    'success': True,
+                    'players': players_data,
+                    'total': len(players_data)
+                })
+            except CampTournament.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Camp not found'})
+        
+        return JsonResponse({'success': False, 'error': 'Missing data'})
+    
+    # ✅ AJAX: Save attendance
+    if request.method == 'POST' and request.POST.get('attendance_date'):
+        date_str = request.POST.get('attendance_date')
+        camp_id = request.POST.get('camp_id')
+        
+        if date_str and camp_id:
+            try:
+                camp = CampTournament.objects.get(id=camp_id)
+                saved = 0
+                
+                for key, status in request.POST.items():
+                    if key.startswith('status_') and status:
+                        player_id = int(key.split('_')[1])
+                        player = Player.objects.get(id=player_id)
+                        
+                        PlayerAttendance.objects.update_or_create(
+                            player=player,
+                            camp=camp,
+                            attendance_date=date_str,
+                            defaults={'status': status}
+                        )
+                        saved += 1
+                
+                return JsonResponse({
+                    'success': True,
+                    'saved_count': saved,
+                    'message': f'Saved {saved} records'
+                })
+            except Exception as e:
+                return JsonResponse({'success': False, 'message': str(e)})
+    
+    # Regular page load
+    context = {'camps': camps}
+    return render(request, 'player_app/camps/camp_attendance_work.html', context)
+
+@require_http_methods(["GET", "POST"])
+def load_camp_participants(request):
+    """
+    AJAX endpoint: Load participants for selected camp + existing attendance
+    """
+    camp_id = request.GET.get('camp_id')
+    date_str = request.GET.get('date')
+    
+    if not camp_id or not date_str:
+        return JsonResponse({'error': 'Camp ID and date required'}, status=400)
+    
+    try:
+        camp = CampTournament.objects.get(id=camp_id)
+        date = date_str  # Already validated as date string
+        
+        # Get all participants for this camp
+        participants = camp.participants.all().select_related('attendances')
+        
+        # Get existing attendance for this date
+        existing_attendance = {
+            att.player_id: att.status 
+            for att in PlayerAttendance.objects.filter(
+                camp_id=camp_id, 
+                attendance_date=date
+            ).select_related('player')
+        }
+        
+        player_data = []
+        for player in participants:
+            player_data.append({
+                'id': player.id,
+                'name': player.name,
+                'existing_status': existing_attendance.get(player.id, '')
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'players': player_data,
+            'total': len(player_data)
+        })
+    
+    except CampTournament.DoesNotExist:
+        return JsonResponse({'error': 'Camp not found'}, status=404)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date'}, status=400)
+
+@require_http_methods(["POST"])
+def save_attendance(request):
+    """Save attendance for selected players"""
+    date_str = request.POST.get('attendance_date')
+    camp_id = request.POST.get('camp_id')
+    
+    if not date_str or not camp_id:
+        return JsonResponse({'success': False, 'message': 'Date and camp required'}, status=400)
+    
+    try:
+        camp = CampTournament.objects.get(id=camp_id)
+        date = date_str
+        
+        saved_count = 0
+        for key, status in request.POST.items():
+            if key.startswith('status_'):
+                player_id = int(key.split('_')[1])
+                player = Player.objects.get(id=player_id)
+                
+                # Update or create attendance
+                PlayerAttendance.objects.update_or_create(
+                    player=player,
+                    camp=camp,
+                    attendance_date=date,
+                    defaults={'status': status}
+                )
+                saved_count += 1
+        
+        return JsonResponse({
+            'success': True,
+            'saved_count': saved_count,
+            'message': f'Saved {saved_count} attendance records'
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+def camp_attendace_data(request):
+    
+    search_query = request.GET.get('search', '').strip()
+
+    # Use the dedicated model instead of TestAndResult
+    results = (
+        PlayerAttendance.objects
+        .select_related('player', 'camp')
+        .order_by('-attendance_date')
+    )
+
+    if search_query:
+        results = results.filter(player__name__icontains=search_query)
+
+    paginator = Paginator(results, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        
+        'page_obj': page_obj,
+        'total_results': paginator.count,
+        'search_query': search_query,
+    }
+    return render(request, 'player_app/camps/camp_attendance_data.html', context)
+
+
 @csrf_exempt
 @login_required
 @require_http_methods(["POST"])
@@ -8354,38 +8923,1195 @@ def filter_players_attendance(request):
         'players': [{'id': p.id, 'name': p.name} for p in players]
     })
 
-
 @login_required
 def attendance_report_view(request):
     """
-    Attendance Report - Filter by Date (All Camps/Tournaments)
+    Monthly Attendance Report with Daily Log Grid + Player Summary
     """
     user_org = getattr(request.user, "organization", None)
     
-    # Get all camps/tournaments for dropdown
+    report_month = None
+    report_data = []
+    player_summaries = []
+    summary_stats = {}
+    total_days = 0
+
+    days_in_month = []
+    players = []
+    attendance_map = {}
+
+    if request.method == 'GET':
+        month_str = request.GET.get('report_month')
+        if month_str:
+            year, month = map(int, month_str.split('-'))
+            start_date = datetime(year, month, 1).date()
+
+            # Last day of month
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1).date() + relativedelta(days=-1)
+            else:
+                end_date = datetime(year, month + 1, 1).date() + relativedelta(days=-1)
+
+            report_month = month_str
+            total_days = (end_date - start_date).days + 1
+
+            # Build list of all days in the month
+            current = start_date
+            while current <= end_date:
+                days_in_month.append(current)
+                current += timedelta(days=1)
+            days_in_month.reverse()
+            # Fetch all attendance for month
+            report_data = PlayerAttendance.objects.filter(
+                attendance_date__range=[start_date, end_date],
+                player__organization=user_org
+            ).select_related('player', 'camp').order_by('player__name', 'attendance_date')
+
+            # Unique players
+            players = Player.objects.filter(
+                organization=user_org,
+                id__in=report_data.values_list('player_id', flat=True).distinct()
+            ).order_by('name')
+
+            # Build attendance map: {player_id: {date: status}}
+            attendance_map = defaultdict(dict)
+            for att in report_data:
+                attendance_map[att.player.id][att.attendance_date] = att.status
+
+            # Player summary (your existing logic)
+            player_stats = PlayerAttendance.objects.filter(
+                attendance_date__range=[start_date, end_date],
+                player__organization=user_org
+            ).values('player__id', 'player__name').annotate(
+                st_rh_count=Count('id', filter=Q(status='ST/RH')),
+                cd_count=Count('id', filter=Q(status='CD')),
+                a_inj_count=Count('id', filter=Q(status='A-INJ')),
+                a_pr_count=Count('id', filter=Q(status='A-PR')),
+                r_count=Count('id', filter=Q(status='R')),
+                total_count=Count('id')
+            ).order_by('-total_count')
+
+            player_summaries = [
+                {
+                    'player_id': item['player__id'],
+                    'player_name': item['player__name'],
+                    'st_rh_count': item['st_rh_count'],
+                    'cd_count': item['cd_count'],
+                    'a_inj_count': item['a_inj_count'],
+                    'a_pr_count': item['a_pr_count'],
+                    'r_count': item['r_count'],
+                    'total_count': item['total_count'],
+                    'present_days': item['st_rh_count'] + item['cd_count'],
+                    'absent_days': item['a_inj_count'] + item['a_pr_count'] + item['r_count'],
+                }
+                for item in player_stats
+            ]
+
+            # Summary stats
+            all_attendance = PlayerAttendance.objects.filter(
+                attendance_date__range=[start_date, end_date],
+                player__organization=user_org
+            )
+
+            summary_stats = {
+                'total_records': report_data.count(),
+                'total_players': all_attendance.values('player').distinct().count(),
+                'total_present': all_attendance.filter(Q(status__in=['ST/RH', 'CD'])).count()
+            }
+
+    context = {
+        'report_month': report_month,
+        'report_data': report_data,
+        'player_summaries': player_summaries,
+        'summary_stats': summary_stats,
+        'total_days': total_days,
+
+        # NEW for Daily Log
+        'days_in_month': days_in_month,
+        'players': players,
+        'attendance_map': dict(attendance_map),
+    }
+
+    return render(request, 'player_app/camps/attendance_report.html', context)
+
+
+@login_required
+def bowlerdrills_create(request, camp_id=None):
+    user_org = getattr(request.user, "organization", None)
+    if not user_org:
+        return redirect('dashboard')
+    
+    # Get camps for dropdown
     camps = CampTournament.objects.filter(
         organization=user_org, 
-        is_deleted=False
+        
     ).order_by('name')
     
-    report_date = None
-    report_data = []
+    # Get players based on selected camp (if any)
+    players = Player.objects.none()
+    selected_camp_id = camp_id
     
-    if request.method == 'GET':
-        date_str = request.GET.get('report_date')
-        if date_str:
-            from datetime import datetime
-            report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    selected_camp =  camp = get_object_or_404(
+            CampTournament, 
+            id=camp_id, 
+            organization=user_org, 
             
-            # Fetch ALL attendance for selected date across ALL camps
-            report_data = PlayerAttendance.objects.filter(
-                attendance_date=report_date,
-                player__organization=user_org
-            ).select_related('player', 'camp').order_by('camp__name', 'player__name')
+        )
+    if camp_id:
+        camp = get_object_or_404(
+            CampTournament, 
+            id=camp_id, 
+            organization=user_org, 
+            
+        )
+        players = camp.participants.filter(organization=user_org,role__in=['Bowler','All-rounder']).order_by('name')
+        selected_camp_id = camp_id
+    
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                camp_id = request.POST.get('camp')
+                date = request.POST.get('date')
+                
+                if not camp_id or not date:
+                    return JsonResponse({'success': False, 'error': 'Camp and date are required'}, status=400)
+                
+                created_drills = []
+                # Process all players' data
+                for player in players:
+                    balls_key = f'balls_{player.id}'
+                    balls_bowled = request.POST.get(balls_key)
+                    
+                    if balls_bowled and int(balls_bowled) >= 0:
+                        BowlerDrill.objects.create(
+                            player_id=player.id,
+                            camp_id=camp_id,
+                            date=date,
+                            no_balls=int(balls_bowled)
+                        )
+                        created_drills.append(player.name)
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True, 
+                        'count': len(created_drills),
+                        'players': created_drills
+                    })
+            
+            return redirect('bowlerdrills_create',camp_id=camp_id)
+            
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    context = {
+        'selected_camp':selected_camp,
+        'camps': camps,
+        'players': players,
+        'selected_camp_id': selected_camp_id,
+    }
+    return render(request, 'player_app/camps/bowlerdrills_create.html', context)
+
+
+# 1. MAIN FORM VIEW
+@login_required
+def bowlerdrills_create_common(request):
+    user_org = getattr(request.user, "organization", None)
+    if not user_org:
+        return redirect('dashboard')
+    
+    camps = CampTournament.objects.all().order_by('name')
+    context = {'camps': camps}
+    return render(request, 'player_app/camps/bowlerdrills_create_common.html', context)
+
+
+@login_required
+def api_load_players(request):
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return JsonResponse({'error': 'AJAX only'}, status=400)
+    
+    camp_id = request.GET.get('camp_id')
+    
+    if not camp_id:
+        return JsonResponse({'players': [], 'error': 'Camp ID required'})
+    
+    try:
+        print(f"Loading players for camp_id: {camp_id}")  # Debug log
+        camp = get_object_or_404(CampTournament, id=camp_id)
+        # ✅ CORRECT for ManyToManyField 'participants'
+        players = camp.participants.all()
+        players_data = [{'id': p.id, 'name': str(p)} for p in players]
+        return JsonResponse({'players': players_data})
+    except Exception as e:
+        return JsonResponse({'players': [], 'error': str(e)})
+
+# 3. SAVE DRILLS API - CORRECTED  
+@login_required
+def api_save_drills(request):
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest' or request.method != 'POST':
+        return JsonResponse({'error': 'POST AJAX only'}, status=400)
+    
+    try:
+        with transaction.atomic():
+            camp_id = request.POST.get('camp')
+            date = request.POST.get('date')
+            
+            if not camp_id or not date:
+                return JsonResponse({'success': False, 'error': 'Camp and date required'}, status=400)
+            
+            camp = get_object_or_404(CampTournament, id=camp_id)
+            # ✅ SAME CORRECT FILTER
+            players = camp.participants.all()
+            
+            created_drills = []
+            for player in players:
+                balls_key = f'balls_{player.id}'
+                balls_bowled = request.POST.get(balls_key)
+                
+                if balls_bowled:
+                    try:
+                        no_balls = int(balls_bowled)
+                        if no_balls >= 0:
+                            BowlerDrill.objects.create(
+                                player_id=player.id,
+                                camp_id=camp_id,
+                                date=date,
+                                no_balls=no_balls
+                            )
+                            created_drills.append(str(player))
+                    except ValueError:
+                        continue
+            
+            return JsonResponse({
+                'success': True,
+                'count': len(created_drills),
+                'players': created_drills
+            })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+
+
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
+@login_required
+def bowlerdrills_list(request):
+    user_org = getattr(request.user, "organization", None)
+    
+    # Base queryset
+    drills_base = BowlerDrill.objects.filter(
+        camp__organization__in=Player.objects.filter(
+            organization=user_org,
+        ).values_list('organization', flat=True) if user_org else []
+    ).select_related('player', 'camp')
+    
+    # Search and filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp')
+    date_str = request.GET.get('date')
+    
+    if search_query:
+        drills_base = drills_base.filter(
+            Q(player__name__icontains=search_query) |
+            Q(camp__name__icontains=search_query)
+        )
+    
+    if camp_id:
+        drills_base = drills_base.filter(camp_id=camp_id)
+    
+    if date_str:
+        drills_base = drills_base.filter(date=date_str)
+    
+    drills = drills_base.order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(drills, 20)
+    page_number = request.GET.get('page')
+    
+    try:
+        drills_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        drills_page = paginator.page(1)
+    except EmptyPage:
+        drills_page = paginator.page(paginator.num_pages)
+    
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+    
+    context = {
+        'drills': drills_page,
+        'camps': camps,
+        'page_obj': drills_page,
+        'paginator': paginator,
+        'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+    }
+    return render(request, 'player_app/camps/bowlerdrills_list.html', context)
+
+
+
+@login_required
+def camp_drill_report(request):
+    user_org = getattr(request.user, "organization", None)
+    camp_id = request.GET.get('camp')
+    selected_date = request.GET.get('date')  # New date filter
+    
+    # Get camps via player relationship
+    camps = CampTournament.objects.filter(
+        bowler_drills__player__organization=user_org
+    ).distinct().order_by('name')
+    
+    drills = BowlerDrill.objects.none()
+    if camp_id and user_org:
+        drill_filter = {
+            'camp_id': camp_id,
+            'player__organization': user_org
+        }
+        if selected_date:  # Filter by date if provided
+            drill_filter['date'] = selected_date
+            
+        drills = BowlerDrill.objects.filter(
+            **drill_filter
+        ).select_related('player', 'camp').order_by('-date', 'player__name')
     
     context = {
         'camps': camps,
-        'report_date': report_date,
-        'report_data': report_data,
+        'drills': drills,
+        'selected_camp': camp_id,
+        'selected_date': selected_date,  # Pass selected date to template
     }
-    return render(request, 'player_app/camps/attendance_report.html', context)
+    return render(request, 'player_app/camps/camp_drill_report.html', context)
+
+
+@login_required
+def player_drill_report(request):
+    user_org = getattr(request.user, "organization", None)
+    player_id = request.GET.get('player')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    camp_id = request.GET.get('camp')
+    
+    # Get players and camps for dropdowns
+    players = Player.objects.filter(organization=user_org).order_by('name')
+    camps = CampTournament.objects.filter(
+        bowler_drills__player__organization=user_org
+    ).distinct().order_by('name')
+    
+    drills = BowlerDrill.objects.none()
+    selected_player = None
+    
+    # FIXED: Check if player_id exists AND belongs to user's organization
+    if player_id:
+        selected_player = Player.objects.filter(
+            id=player_id, 
+            organization=user_org
+        ).first()
+        
+        if selected_player:  # Only filter drills if valid player
+            drill_filter = {'player_id': player_id}
+            
+            if start_date:
+                drill_filter['date__gte'] = start_date
+            if end_date:
+                drill_filter['date__lte'] = end_date
+            if camp_id:
+                drill_filter['camp_id'] = camp_id
+                
+            drills = BowlerDrill.objects.filter(
+                **drill_filter
+            ).select_related('player', 'camp').order_by('-date')
+    
+   
+    
+    context = {
+        'players': players,
+        'camps': camps,
+        'drills': drills,
+        'selected_player': selected_player,
+        'selected_player_id': player_id, 
+        'selected_camp': camp_id,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'player_app/camps/player_drill_report.html', context)
+
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def bowler_report_check(request, camp_id=None):
+    user_org = getattr(request.user, "organization", None)
+
+    players = Player.objects.filter(organization=user_org).order_by('name')
+    if camp_id:
+        players = Player.objects.filter(
+            bowler_drills__camp_id=camp_id,
+            organization=user_org
+        ).distinct().order_by('name')
+    else:
+        players = Player.objects.filter(organization=user_org).order_by('name')
+
+    camps = CampTournament.objects.filter(
+        bowler_drills__player__organization=user_org
+    ).distinct().order_by('name')
+    camp_select =  camp = get_object_or_404(
+            CampTournament, 
+            id=camp_id, 
+            organization=user_org, 
+            
+        )
+    
+    context = {
+        'players': players,
+        'camps': camps,
+        'camp_select':camp_select,
+    }
+    return render(request, 'player_app/tests/player_load_report.html', context)
+
+
+from django.shortcuts import render, get_object_or_404
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib.auth.decorators import login_required
+@login_required
+def bowler_report_generated(request):
+    user_org = getattr(request.user, "organization", None)
+    player_id = request.POST.get('player')
+    selected_date = request.POST.get('selected_date')
+    form_camp_id = request.POST.get('camp')
+    
+    # Use form camp OR session camp
+    final_camp_id = form_camp_id or request.session.get('bowling_camp_id')
+    
+    camp_select = None
+    if final_camp_id:
+        try:
+            camp_select = CampTournament.objects.get(id=final_camp_id)
+        except CampTournament.DoesNotExist:
+            camp_select = None
+            final_camp_id = None
+
+    # Filter players
+    if final_camp_id:
+        players = Player.objects.filter(
+            bowler_drills__camp_id=final_camp_id,
+            organization=user_org,
+            role__in=['Bowler', 'All-rounder']
+        ).distinct().order_by('name')
+    else:
+        players = Player.objects.filter(
+            organization=user_org,
+            role__in=['Bowler', 'All-rounder']
+        ).order_by('name')
+
+    camps = CampTournament.objects.filter(
+        bowler_drills__player__organization=user_org
+    ).distinct().order_by('name')
+
+    if not selected_date:
+        selected_date = timezone.now().date().strftime('%Y-%m-%d')
+
+    drills = BowlerDrill.objects.none()
+    load_drills_7d = []
+    load_drills_28d = []
+    all_load_drills = []
+    
+    # **INITIALIZE**
+    start_filter = None
+    end_filter_7d = None  # End of 7-day window (selected_date - 1 day)
+    lookback_days = 28
+    selected_player = None
+    selected_player_name = ''
+    
+    # **SESSION SETTINGS**
+    lambda_acute = request.session.get('bowling_acute_lambda', 0.25)
+    lambda_chronic = request.session.get('bowling_cronic_lambda', 0.069)
+    date_range = request.session.get('bowling_date_range', 'last28')
+    
+    
+    if player_id:
+        selected_player = Player.objects.filter(id=player_id, organization=user_org).first()
+        selected_player_name = getattr(selected_player, 'name', '')
+        
+        drill_filter = {'player_id': player_id}
+        if final_camp_id:
+            drill_filter['camp_id'] = final_camp_id
+        
+        # **🎯 SELECTED DATE SETUP**
+        selected_date_obj = timezone.datetime.strptime(selected_date, '%Y-%m-%d').date()
+        
+        # **LAST 7 DAYS: selected_date backwards (18 Jan -> 17,16,15,14,13,12,11 Jan)**
+        end_filter_7d = selected_date_obj - timedelta(days=1)  # Last day before selected_date
+        start_filter_7d = end_filter_7d - timedelta(days=6)    # 7 days total
+        
+        # **FULL LOOKUP RANGE: 7-day + chronic lookback**
+        days_back = {'last28': 28, 'last10': 10, 'last60': 60, 'last90': 90, 'last180': 180, 'last365': 365}
+        lookback_days = days_back.get(date_range, 28)
+        start_filter = start_filter_7d - timedelta(days=lookback_days - 7)  # Extend for chronic
+        end_filter = selected_date_obj  # Up to selected_date
+        
+
+        
+        drill_filter['date__gte'] = start_filter
+        drill_filter['date__lte'] = end_filter
+        
+        drills = BowlerDrill.objects.filter(**drill_filter).select_related('player', 'camp').order_by('date')
+      
+        
+        # **EWMA CALCULATION**
+        if drills.exists():
+            drill_list = list(drills)
+            acute_prev = 0
+            chronic_prev = 0
+            
+            for drill in drill_list:
+                balls = drill.no_balls
+                acute_load = lambda_acute * balls + (1 - lambda_acute) * acute_prev
+                chronic_load = lambda_chronic * balls + (1 - lambda_chronic) * chronic_prev
+                
+                ac_ratio = acute_load / chronic_load if chronic_load > 0 else 0
+                
+                all_load_drills.append({
+                    'date': drill.date,
+                    'no_balls': balls,
+                    'acute_load': round(acute_load, 2),
+                    'chronic_load': round(chronic_load, 2),
+                    'ac_ratio': round(ac_ratio, 2),
+                    'days_from_selected': (drill.date - selected_date_obj).days
+                })
+                
+                acute_prev = acute_load
+                chronic_prev = chronic_load
+            
+            # **FILL COMPLETE RANGE**
+            all_dates = []
+            current_date = start_filter
+            while current_date <= end_filter:
+                all_dates.append(current_date)
+                current_date += timedelta(days=1)
+            
+            complete_load_drills = []
+            date_dict = {d['date']: d for d in all_load_drills}
+            last_acute = 0
+            last_chronic = 0
+            last_ac_ratio = 0
+            
+            for date_obj in all_dates:
+                if date_obj in date_dict:
+                    drill_data = date_dict[date_obj]
+                    last_acute = drill_data['acute_load']
+                    last_chronic = drill_data['chronic_load']
+                    last_ac_ratio = drill_data['ac_ratio']
+                else:
+                    drill_data = {
+                        'date': date_obj,
+                        'no_balls': 0,
+                        'acute_load': last_acute,
+                        'chronic_load': last_chronic,
+                        'ac_ratio': last_ac_ratio,
+                        'days_from_selected': (date_obj - selected_date_obj).days
+                    }
+                complete_load_drills.append(drill_data)
+            
+            all_load_drills = sorted(complete_load_drills, key=lambda x: x['date'], reverse=True)
+            
+            # **🎯 LAST 7 DAYS: Exactly 7 days before selected_date**
+            load_drills_7d = [d for d in all_load_drills if start_filter_7d <= d['date'] <= end_filter_7d]
+            load_drills_7d = sorted(load_drills_7d, key=lambda x: x['date'], reverse=True)
+            
+            # **28 DAYS: From selected_date backwards**
+            past_28_days = [d for d in all_load_drills if d['days_from_selected'] <= 0][:28]
+            load_drills_28d = sorted(past_28_days, key=lambda x: x['date'], reverse=True)
+
+    # **SUMMARY STATS (7-day window)**
+    active_sessions_7d = len([d for d in load_drills_7d if d['no_balls'] > 0]) if load_drills_7d else 0
+    total_balls_7d = sum(d['no_balls'] for d in load_drills_7d)
+    avg_balls_7d = round(total_balls_7d / active_sessions_7d, 1) if active_sessions_7d > 0 else 0
+    
+    last_day_ac = 0
+    last_day_acute = 0
+    last_day_chronic = 0
+    if load_drills_7d:
+        last_drill = load_drills_7d[0]  # Most recent (end_filter_7d)
+        last_day_ac = last_drill['ac_ratio']
+        last_day_acute = last_drill['acute_load']
+        last_day_chronic = last_drill['chronic_load']
+
+    context = {
+        'players': players,
+        'camps': camps,
+        'drills': drills,
+        'load_drills_7d': load_drills_7d,  # ✅ 17,16,15,14,13,12,11 Jan
+        'load_drills_28d': load_drills_28d,
+        'all_load_drills': all_load_drills,
+        'selected_player_id': player_id,
+        'selected_camp': final_camp_id,
+        'selected_date': selected_date,
+        'camp_select': camp_select,
+        'session_settings': {
+            'acute_lambda': lambda_acute,
+            'chronic_lambda': lambda_chronic,
+            'date_range': date_range,
+        },
+        'selected_player_name': selected_player_name,
+        'active_sessions_7d': active_sessions_7d,
+        'avg_balls_7d': avg_balls_7d,
+        'last_day_ac': last_day_ac,
+        'last_day_acute': last_day_acute,
+        'last_day_chronic': last_day_chronic,
+        'date_range_info': {
+            'selected_date': selected_date_obj.strftime('%d %b %Y') if 'selected_date_obj' in locals() else '',
+            'seven_day_start': start_filter_7d.strftime('%d %b') if 'start_filter_7d' in locals() else '',
+            'seven_day_end': end_filter_7d.strftime('%d %b') if 'end_filter_7d' in locals() else '',
+            'full_start': start_filter.strftime('%d %b') if start_filter else '',
+            'full_end': end_filter.strftime('%d %b') if 'end_filter' in locals() else '',
+        }
+    }
+    return render(request, 'player_app/tests/player_load_report.html', context)
+
+
+
+def attendance_group_view(request):
+    user_org = getattr(request.user, "organization", None)
+    camps = CampTournament.objects.filter(organization=user_org)
+
+    context ={
+        "camps":camps
+    }
+    return render(request,'player_app/camps/attendance_group_report.html',context)
+
+def bowling_settings_view(request,camp_select=None):
+    user_org = getattr(request.user, "organization", None)
+    return render(request,'player_app/tests/bowling_settings.html',{'organization': user_org, 'camp_select': camp_select})  
+
+from django.shortcuts import redirect
+from django.contrib import messages
+
+def bowling_settings_update(request):
+    if request.method == 'POST':
+        # Extract form values safely with defaults
+        acute_lambda = request.POST.get('acute_lambda', 0.25)
+        cronic_lambda = request.POST.get('cronic_lambda', 0.069)
+        date_range = request.POST.get('date', 'last28')
+        camp_id = request.POST.get('camp_id', None)
+       
+
+        # Save to session (dict-like, auto-saves on assignment)
+        request.session['bowling_acute_lambda'] = float(acute_lambda)
+        request.session['bowling_cronic_lambda'] = float(cronic_lambda)
+        request.session['bowling_date_range'] = date_range
+        
+        # Optional: Save session explicitly and add success message
+        request.session.save()
+        messages.success(request, 'Report settings saved successfully!')
+        
+        # Redirect to avoid resubmission (include your settings page URL)
+        return redirect('bowler_report_check',camp_id=camp_id)  # Replace with your settings page URL name
+    
+    # Handle GET (optional: show current session values in template)
+    return redirect('bowling_settings')
+
+def bowlerdrills_combin(request):
+    return render(request,'player_app/tests/bowlerdrills_combin.html')
+
+def individual_test_data(request):
+    player = None
+    bowler_drill = None
+    camps = []
+    selected_date = None
+    
+    if request.method == 'POST':
+        player_id = request.POST.get('player')
+        date_str = request.POST.get('date')
+        
+        if player_id:
+            player = get_object_or_404(Player, id=player_id)
+            selected_date = parse_date(date_str) if date_str else None
+            
+            if selected_date:
+                # Get available camps/tournaments for the date (considering player gender/age if available)
+                camps_query = CampTournament.objects.filter(
+                    is_deleted=False,
+                    start_date__lte=selected_date
+                )
+                
+                if player.gender:  # Assuming Player has gender field
+                    camps_query = camps_query.filter(
+                        Q(gender=player.gender) | Q(gender__isnull=True)
+                    )
+                
+                # Filter by end_date if set
+                camps_query = camps_query.filter(
+                    Q(end_date__gte=selected_date) | Q(end_date__isnull=True)
+                )
+                
+                camps = camps_query.order_by('name').distinct()
+                
+                # Check if existing data exists (camp can be null)
+                bowler_drill = BowlerDrill.objects.filter(
+                    player=player, 
+                    date=selected_date
+                ).first()
+    
+    context = {
+        'player': player,
+        'selected_date': selected_date,
+        'camps': camps,
+        'bowler_drill': bowler_drill,
+        'players': Player.objects.filter().order_by('name')  # Assuming is_active field
+    }
+    return render(request, 'player_app/tests/individual_test_data.html', context)
+
+@require_http_methods(["POST"])
+def fetch_bowler_data(request):
+    try:
+        data = json.loads(request.body)
+        player_id = data.get('player_id')
+        date_str = data.get('date')
+        
+        player = get_object_or_404(Player, id=player_id)
+        selected_date = parse_date(date_str)
+        
+
+        
+        # **SIMPLIFIED CAMP FILTERING** - Remove complex filters first
+        camps_query = CampTournament.objects.filter(
+            is_deleted=False,
+            start_date__lte=selected_date
+        ).filter(
+            Q(end_date__gte=selected_date) | Q(end_date__isnull=True)
+        )
+        
+
+        
+       
+        
+        camps = list(camps_query.values(
+            'id', 'name', 'camp_type', 'start_date', 'end_date'
+        ).order_by('name'))
+        
+        print(f"DEBUG: Camps returned: {len(camps)}")  # Debug log
+       
+        bowler_drill = None
+        try:
+            bowler_drill = BowlerDrill.objects.select_related('camp').get(
+                player=player, date=selected_date
+            )
+        except BowlerDrill.DoesNotExist:
+            pass
+        
+        existing_data = None
+        if bowler_drill:
+            existing_data = {
+                'camp_id': bowler_drill.camp.id if bowler_drill.camp else None,
+                'camp_name': bowler_drill.camp.name if bowler_drill.camp else None,  # ADD THIS
+                'no_balls': bowler_drill.no_balls,
+                'exists': True
+            }
+            print(f"DEBUG: Existing drill found - Camp: {existing_data['camp_name']}, No Balls: {existing_data['no_balls']}")  # Debug log
+        else:
+            existing_data = {'exists': False}
+        
+        response_data = {
+            'success': True,
+            'camps': camps,
+            'player_name': player.name,
+            'debug_info': {
+                'selected_date': str(selected_date),
+                'total_camps_matched': camps_query.count(),
+                'camps_count_returned': len(camps)
+            },
+            'existing_data': existing_data
+        }
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        print(f"DEBUG ERROR: {str(e)}")  # Debug log
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@require_http_methods(["POST"])
+def save_bowler_data(request):
+    try:
+        data = json.loads(request.body)
+        player_id = data.get('player_id')
+        date_str = data.get('date')
+        camp_id = data.get('camp_id')
+        no_balls = int(data.get('no_balls') or 0)
+        
+        player = get_object_or_404(Player, id=player_id)
+        selected_date = parse_date(date_str)
+        
+        camp = None
+        if camp_id:
+            try:
+                camp = CampTournament.objects.get(id=camp_id, is_deleted=False)
+            except CampTournament.DoesNotExist:
+                camp = None
+        
+        # Get or create bowler drill (respects unique_together constraint)
+        bowler_drill, created = BowlerDrill.objects.update_or_create(
+            player=player,
+            date=selected_date,
+            defaults={
+                'camp': camp,
+                'no_balls': no_balls
+            }
+        )
+        
+        action = "created" if created else "updated"
+        return JsonResponse({
+            'success': True, 
+            'message': f'Bowler drill data {action} successfully!',
+            'data': {
+                'id': bowler_drill.id,
+                'camp': camp.name if camp else None,
+                'no_balls': bowler_drill.no_balls,
+                'created': created
+            }
+        })
+        
+    except Player.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Player not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+def player_drill_report_new(request):
+    user_org = getattr(request.user, "organization", None)
+    camps = CampTournament.objects.filter(organization=user_org, is_deleted=False).order_by('name')
+    
+    context = {
+        'camps': camps,
+        'players': Player.objects.none(),  # Empty initially
+    }
+    
+    # If camp selected via GET
+    camp_id = request.GET.get('camp')
+    if camp_id:
+        camp = CampTournament.objects.filter(id=camp_id, organization=user_org).first()
+        if camp:
+            # Load camp players - adjust relation as needed
+            camp_players = Player.objects.filter(camps=camp).order_by('name')  # or camp.players.all()
+            context['players'] = camp_players
+            context['selected_camp'] = camp_id
+            context['camp_name'] = camp.name
+    
+    # Apply filters for drills
+    player_id = request.GET.get('player')
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    drills_qs = BowlerDrill.objects.filter(camp__organization=user_org).select_related('player', 'camp').order_by('-date')
+    
+    if camp_id:
+        drills_qs = drills_qs.filter(camp_id=camp_id)
+    if player_id:
+        drills_qs = drills_qs.filter(player_id=player_id)
+    if start_date_str and end_date_str:
+        drills_qs = drills_qs.filter(date__range=[start_date_str, end_date_str])
+    elif start_date_str:
+        drills_qs = drills_qs.filter(date__gte=start_date_str)
+    elif end_date_str:
+        drills_qs = drills_qs.filter(date__lte=end_date_str)
+    
+    context['drills'] = drills_qs
+    context['selected_player'] = player_id
+    context['start_date'] = start_date_str
+    context['end_date'] = end_date_str
+    
+    return render(request, 'player_app/record/player_drill_report_new.html', context)
+
+@require_http_methods(["GET"])
+@login_required
+def load_camp_players(request):
+    camp_id = request.GET.get('camp_id')
+    user_org = getattr(request.user, "organization", None)
+    
+    if not camp_id:
+        return JsonResponse({'players': []})
+    
+    camp = CampTournament.objects.filter(id=camp_id, organization=user_org).first()
+    if not camp:
+        return JsonResponse({'players': []})
+    
+    # Load only players in this camp
+    players = Player.objects.filter(camps=camp).values('id', 'name').order_by('name')
+    # Adjust filter: .filter(camp_tournament=camp) or camp.players.all()
+    
+    return JsonResponse({'players': list(players)})
+
+
+def camp_test_data(request):
+    camps = CampTournament.objects.filter(is_deleted=False).order_by('name')
+    context = {
+        'camps': camps,
+    }
+    return render(request, 'player_app/tests/camp_test_data.html', context)
+
+@require_http_methods(["POST"])
+def fetch_camp_data(request):
+    try:
+        # **FIX 1: Use request.POST for form data first, fallback to JSON**
+        camp_id = request.POST.get('camp_id') or json.loads(request.body.decode('utf-8')).get('camp_id')
+        date_str = request.POST.get('date') or json.loads(request.body.decode('utf-8')).get('date')
+        
+        if not camp_id or not date_str:
+            return JsonResponse({'success': False, 'error': 'Missing camp_id or date'}, status=400)
+        
+        camp = get_object_or_404(CampTournament, id=camp_id, is_deleted=False)
+        selected_date = parse_date(date_str)
+        
+        if not selected_date:
+            return JsonResponse({'success': False, 'error': 'Invalid date format'}, status=400)
+        
+        # Get all players in this camp
+        camp_players = camp.participants.filter()
+        
+        # Get existing bowler drills for this camp/date
+        existing_drills = BowlerDrill.objects.filter(
+            player__in=camp_players,
+            camp=camp,
+            date=selected_date
+        ).values('player_id', 'no_balls')
+        
+        # Convert to dict for quick lookup
+        drills_dict = {drill['player_id']: drill['no_balls'] for drill in existing_drills}
+        
+        # Prepare player data with existing bowls
+        players_data = []
+        for player in camp_players:
+            existing_bowls = drills_dict.get(player.id, None)
+            players_data.append({
+                'id': player.id,
+                'name': player.name,
+                'existing_bowls': existing_bowls
+            })
+        
+      
+        
+        response_data = {
+            'success': True,
+            'camp_name': camp.name,
+            'selected_date': date_str,
+            'players': players_data,
+            'total_players': len(players_data)
+        }
+        return JsonResponse(response_data)
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON ERROR: {e}")
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
+    except CampTournament.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Camp not found'}, status=404)
+    except Exception as e:
+        print(f"ERROR: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@require_http_methods(["POST"])
+def save_camp_data(request):
+    try:
+        data = json.loads(request.body)
+        camp_id = data.get('camp_id')
+        date_str = data.get('date')
+        player_data = data.get('player_data', [])  # List of {player_id, no_balls}
+        
+        camp = get_object_or_404(CampTournament, id=camp_id, is_deleted=False)
+        selected_date = parse_date(date_str)
+        
+        saved_count = 0
+        for player_item in player_data:
+            player_id = player_item.get('player_id')
+            no_balls = int(player_item.get('no_balls') or 0)
+            
+            player = get_object_or_404(Player, id=player_id)
+            
+            # Update or create
+            bowler_drill, created = BowlerDrill.objects.update_or_create(
+                player=player,
+                camp=camp,
+                date=selected_date,
+                defaults={'no_balls': no_balls}
+            )
+            saved_count += 1
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Saved data for {saved_count} players!',
+            'saved_count': saved_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+from django.shortcuts import render
+from datetime import date  # Add this import
+from dateutil.relativedelta import relativedelta
+import calendar
+
+def attendance_group_report(request):
+
+    context = {
+        'camps': CampTournament.objects.all().order_by('name'),
+        'daily_data': [],
+        'player_summaries': [],
+        'total_player_days': 0,
+        'unique_players': 0,
+        'total_present': 0,
+        'total_absent': 0,  # NEW: Total absent count
+        'total_days': 0,
+        'report_month': None,
+        'selected_camp': None,
+        'selected_camp_name': None,
+        'overall_present_pct': 0,  # NEW: Overall present percentage
+        'overall_absent_pct': 0,   # NEW: Overall absent percentage
+    }
+    
+    if request.method == 'POST':
+        report_month = request.POST.get('report_month')
+        camp_id = request.POST.get('camp')
+        
+        if report_month:
+            context['report_month'] = report_month
+            
+            # Parse month/year
+            year, month = map(int, report_month.split('-'))
+            
+            # Get all days in month
+            _, total_days = calendar.monthrange(year, month)
+            context['total_days'] = total_days
+            
+            # Date range
+            start_date = date(year, month, 1)
+            end_date = date(year, month, total_days)
+            
+            # Base attendance queryset
+            attendance_qs = PlayerAttendance.objects.filter(
+                attendance_date__range=[start_date, end_date]
+            ).select_related('player', 'camp')
+            
+            # Apply camp filter
+            if camp_id:
+                try:
+                    camps = CampTournament.objects.get(id=camp_id)
+                    context['selected_camp'] = camp_id
+                    context['selected_camp_name'] = camps.name
+                    attendance_qs = attendance_qs.filter(camp=camps)
+                except CampTournament.DoesNotExist:
+                    pass
+            
+            # Get unique players
+            player_ids = attendance_qs.values_list('player_id', flat=True).distinct()
+            all_players = Player.objects.filter(id__in=player_ids).order_by('name')
+            context['unique_players'] = all_players.count()
+            
+            # Group attendance by date and player
+            attendance_dict = {}
+            for attendance in attendance_qs:
+                date_key = attendance.attendance_date.strftime('%Y-%m-%d')
+                player_key = attendance.player_id
+                if date_key not in attendance_dict:
+                    attendance_dict[date_key] = {}
+                attendance_dict[date_key][player_key] = attendance
+            
+            # Build daily data (all days x all players)
+            daily_data = []
+            total_player_days = 0
+            
+            current_date = start_date
+            while current_date <= end_date:
+                date_key = current_date.strftime('%Y-%m-%d')
+                day_players = []
+                
+                for player in all_players:
+                    attendance = attendance_dict.get(date_key, {}).get(player.id)
+                    day_players.append({
+                        'player': player,
+                        'status': attendance.status if attendance else None,
+                        'get_status_display': attendance.get_status_display() if attendance else None
+                    })
+                
+                daily_data.append({
+                    'day': current_date,
+                    'players': day_players
+                })
+                
+                total_player_days += len(day_players)
+                current_date += relativedelta(days=1)
+            
+            context['daily_data'] = daily_data
+            context['total_player_days'] = total_player_days
+            
+            # Calculate total present and absent
+            total_present = 0
+            total_absent = 0
+            for day_data in daily_data:
+                for player_data in day_data['players']:
+                    if player_data['status'] is not None:  # Has record = Present
+                        total_present += 1
+                    else:  # No record = Absent
+                        total_absent += 1
+            
+            context['total_present'] = total_present
+            context['total_absent'] = total_absent
+            
+            # Overall percentages
+            if total_player_days > 0:
+                context['overall_present_pct'] = round((total_present / total_player_days) * 100, 1)
+                context['overall_absent_pct'] = round((total_absent / total_player_days) * 100, 1)
+            
+            # Player summaries with Present/Absent counts
+            player_stats = {}
+            for day_data in daily_data:
+                for player_data in day_data['players']:
+                    player_id = player_data['player'].id
+                    if player_id not in player_stats:
+                        player_stats[player_id] = {
+                            'player': player_data['player'],
+                            'counts': {},
+                            'total_days': 0,
+                            'present_days': 0,
+                            'absent_days': 0
+                        }
+                    
+                    player_stats[player_id]['total_days'] += 1
+                    
+                    if player_data['status']:
+                        # Present with specific status
+                        status = player_data['status']
+                        player_stats[player_id]['counts'][status] = player_stats[player_id]['counts'].get(status, 0) + 1
+                        player_stats[player_id]['present_days'] += 1
+                    else:
+                        # Absent (no record)
+                        player_stats[player_id]['absent_days'] += 1
+            
+            player_summaries = []
+            for player_id, stats in player_stats.items():
+                counts = stats['counts']
+                summary = {
+                    'player_name': stats['player'].name,
+                    'st_rh_count': counts.get('ST/RH', 0),
+                    'cd_count': counts.get('CD', 0),
+                    'a_inj_count': counts.get('A-INJ', 0),
+                    'a_pr_count': counts.get('A-PR', 0),
+                    'r_count': counts.get('R', 0),
+                    'total_count': sum(counts.values()),
+                    'present_days': stats['present_days'],  # NEW
+                    'absent_days': stats['absent_days'],    # NEW
+                    'total_days': stats['total_days'],  
+                    
+                    'present_pct': round((stats['present_days'] / stats['total_days']) * 100, 1) if stats['total_days'] > 0 else 0,  # NEW
+                }
+
+                player_summaries.append(summary)
+            
+            player_summaries.sort(key=lambda x: x['present_pct'], reverse=True)
+            context['player_summaries'] = player_summaries
+
+    return render(request, 'player_app/camps/attendance_group_report.html', context)

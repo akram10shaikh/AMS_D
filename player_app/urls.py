@@ -1,3 +1,4 @@
+from django.http import JsonResponse
 from django.urls import path
 from django.conf.urls.static import static
 from django.conf import settings
@@ -81,10 +82,47 @@ urlpatterns = [
                   path('organization/camp/edit/<int:camp_id>/', views.organization_edit_camp, name='organization_edit_camp'),
                   path('organization/camp/create/', views.organization_create_camp, name='organization_create_camp'),
                   path('organization/camp/<int:camp_id>/delete/', views.organization_delete_camp, name='organization_delete_camp'),
+                  path('camp/<int:camp_id>/stats/', views.camp_stats, name='camp_stats'),
 
                   path('organization/camp/<int:camp_id>/attendance/', views.camp_attendance_view, name='camp_attendance'),
                   path('ajax/filter-players-attendance/', views.filter_players_attendance, name='filter_players_attendance'),
                   path('organization/attendance-report/', views.attendance_report_view, name='attendance_report'),
+                  path('reports/attendance-view/',views.attendance_group_view,name='attendance_group_view'),
+                  path('reports/attendance-group/', views.attendance_group_report, name='attendance_group_report'),
+                  path('camp/',views.camp_attendance_work,name='camp_attendance_work'),
+                  path('camp-attendance/load-participants/', views.load_camp_participants, name='load_camp_participants'),
+                  path('camp_attendace_data/',views.camp_attendace_data,name='camp_attendace_data'),
+
+
+                  path('bowlerdrills/create/', views.bowlerdrills_create, name='bowlerdrills_create'),
+                  path('bowlerdrills/create/<int:camp_id>/', views.bowlerdrills_create, name='bowlerdrills_create'),
+                  path('bowlerdrills/', views.bowlerdrills_list, name='bowlerdrills_list'),
+                  path('bowler_report_check/<int:camp_id>/', views.bowler_report_check, name='bowler_report_check'),
+                  path('bowler_report_generated/',views.bowler_report_generated,name='bowler_report_generated'),
+                  path('bowling-settings/<int:camp_select>/', views.bowling_settings_view, name='bowling_settings'),
+                  path('bowling-settings/update/', views.bowling_settings_update, name='bowling_settings_update'),
+                  path('bowlerdrills-create-common/',views.bowlerdrills_create_common, name='bowlerdrills_create_common'),
+                  path('api/load-players/', views.api_load_players, name='api_load_players'),
+                  path('api/save-drills/', views.api_save_drills, name='api_save_drills'),
+                  path('bowlerdrills_combin/', views.bowlerdrills_combin, name='bowlerdrills_combin'),
+
+                  path('individual-test-data/', views.individual_test_data, name='individual_test_data'),
+                  path('fetch-bowler-data/', views.fetch_bowler_data, name='fetch_bowler_data'),
+                  path('save-bowler-data/', views.save_bowler_data, name='save_bowler_data'),
+
+                  path('camp-test-data/', views.camp_test_data, name='camp_test_data'),
+                  path('fetch-camp-data/', views.fetch_camp_data, name='fetch_camp_data'),
+                  path('save-camp-data/', views.save_camp_data, name='save_camp_data'),
+
+                  path('player_drill_report_new/',views.player_drill_report_new,name='player_drill_report_new'),
+                  path('load-camp-players/', views.load_camp_players, name='load_camp_players'),
+
+
+                  path('reports/camp-drills/', views.camp_drill_report, name='camp_drill_report'),
+                  path('reports/player-drills/', views.player_drill_report, name='player_drill_report'),
+
+
+
 
                   path('organization/phase/<int:id>/', views.phase_tests_view, name='phase_tests_view'), 
                   path('organization/phase-test/<int:id>/',views.phase_test, name='phase_test'),
@@ -92,6 +130,7 @@ urlpatterns = [
                   path('wellness/report/', views.wellness_dashboard, name='wellness_dashboard'),
                   # urls.py
                   path('player-wellness-report/', views.player_wellness_report, name='player_wellness_report'),
+                  path('player_wellness_report_data/',views.player_wellness_report_data,name='player_wellness_report_data'),
 
 
                # Organization Test Results URLs
@@ -101,6 +140,8 @@ urlpatterns = [
                   path('organization/test-dashboard/', views.test_dashboard_new, name='test_dashboard_new'),
                   path('test-results/<str:test_name>/', views.test_results_view, name='test_results_by_name'),
                   path('add-test-results/<str:test_name>/', views.add_test_results, name='add_test_results'),
+                  path('activity-logs/', views.test_activity_logs, name='activity_logs'),
+
 
                   path('organization/dashboard/', views.organization_dashboard_org, name='organization_dashboard_org'),
                   path('org/players-by-category/', views.players_by_category, name='players_by_category'),           
@@ -183,6 +224,7 @@ urlpatterns = [
                   path('fetch-players/', views.fetch_players, name='fetch_players'),
                   path('fetch-report/', views.fetch_report, name='fetch_report'),
                   path("player-report/", views.player_report, name="player_report"),
+                  path('individual_player_report/<str:test_name>/', views.individual_player_report, name='individual_player_report'),
                   
                   # path('multi-test-report/', views.multi_test_report, name='multi_test_report'),
                   path('reports/multi-test/', views.multi_test_report_view, name='multi_test_report'),
