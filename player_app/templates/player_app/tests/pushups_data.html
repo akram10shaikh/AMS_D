@@ -2,103 +2,417 @@
 {% load static %}
 {% load dict_extras %}
 
-{% block title %}Test Results{% endblock %}
+{% block title %}{{ test_name }} Test Results{% endblock %}
 
 {% block extra_head %}
-    <style>
-        table { width: 90%; margin: 1em auto; border-collapse: collapse; }
-        th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
-        th { background-color: #f0f0f0; }
-        #searchInput {
-            width: 300px;
-            padding: 8px;
-            font-size: 16px;
+<style>
+    .report-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        margin-bottom: 100px;
+    }
+
+    .page-header {
+        margin-bottom: 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title {
+        margin: 0;
+        font-size: 28px;
+        color: #333;
+    }
+
+    .filter-form {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        border: 1px solid #e9ecef;
+    }
+
+    .filter-row {
+        display: flex;
+        gap: 15px;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filter-group.search-group {
+        min-width: 300px;
+        flex: 1;
+    }
+
+    .filter-label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #555;
+    }
+
+    .filter-input,
+    .filter-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        background: #fff;
+    }
+
+    .filter-select {
+        min-width: 200px;
+    }
+
+    .filter-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-search {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .btn-clear {
+        background: #6c757d;
+        color: white;
+        padding: 12px 24px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 14px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .results-info {
+        margin-bottom: 20px;
+        padding: 12px;
+        background: #e7f3ff;
+        border-radius: 5px;
+        border-left: 4px solid #007bff;
+    }
+
+    .table-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .results-table {
+        width: 100%;
+        min-width: 900px;
+        border-collapse: collapse;
+    }
+
+    .results-table thead tr {
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .results-table th {
+        padding: 15px 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #495057;
+        white-space: nowrap;
+    }
+
+    .results-table td {
+        padding: 15px 12px;
+        border-bottom: 1px solid #e9ecef;
+        color: #666;
+        vertical-align: middle;
+    }
+
+    .results-table .player-name {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .results-table .best-score {
+        font-weight: bold;
+        color: #28a745;
+        font-size: 16px;
+    }
+
+    .results-table .average-value {
+        color: #888;
+        font-size: 13px;
+    }
+
+    .empty-row td {
+        padding: 40px;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    .pagination-wrap {
+        margin-top: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+
+    .pagination-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .pagination-info {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .pagination-links {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+
+    .pagination-links a,
+    .pagination-links span {
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+    }
+
+    .page-link-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .page-link-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .page-current {
+        background: #007bff;
+        color: white;
+        font-weight: 500;
+    }
+
+    @media (max-width: 992px) {
+        .report-page {
+            padding: 16px;
         }
-        .pagination {
-            text-align: center;
-            margin: 2em 0;
+
+        .filter-row {
+            align-items: stretch;
         }
-        .pagination a, .pagination strong {
-            display: inline-block;
-            padding: 6px 12px;
-            margin: 0 2px;
-            border: 1px solid #ccc;
-            background: #f9f9f9;
-            color: #333;
-            text-decoration: none;
+
+        .filter-group.search-group,
+        .filter-group,
+        .filter-buttons {
+            width: 100%;
         }
-        .pagination strong {
-            background: #e0e0e0;
-            font-weight: bold;
+
+        .filter-select,
+        .filter-input,
+        .btn-search,
+        .btn-clear {
+            width: 100%;
         }
-        form.search-form {
-            text-align: center;
-            margin: 2em auto 1em auto;
+
+        .filter-buttons {
+            flex-direction: column;
         }
-    </style>
+
+        .pagination-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .pagination-links {
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .page-title {
+            font-size: 24px;
+        }
+
+        .filter-form {
+            padding: 15px;
+        }
+
+        .results-table th,
+        .results-table td {
+            padding: 12px 10px;
+            font-size: 13px;
+        }
+
+        .pagination-wrap {
+            padding: 15px;
+        }
+
+        .pagination-links a,
+        .pagination-links span {
+            padding: 8px 10px;
+            font-size: 13px;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-    <h2 style="text-align:center;">{{ test_name }} Test Results</h2>
+<div class="report-page">
 
-    <form method="get" class="search-form" aria-label="Search Player Form">
-        <input type="text" name="search" id="searchInput" placeholder="Search player name..." value="{{ search_query }}">
-        <button type="submit">Search</button>
-    </form>
-
-    <p style="text-align:center; margin-top: 0.5em;">
-        Total rows: {{ total_results }}
-    </p>
-
-    <table id="resultsTable" aria-describedby="results summary">
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>Player</th>
-                <th>Date</th>
-                <th>Phase</th>
-                <th>Best</th>
-                <th>Notes</th>
-                <th>Individual Average</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for result in page_obj %}
-            <tr>
-                <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
-                <td class="player-name">{{ result.player.name }}</td>
-                <td>{{ result.date }}</td>
-                <td>{{ result.phase }}</td>
-                <td>{{ result.best }}</td>
-                <td>{{ result.notes|default:"-" }}</td>
-                <td>{{ latest_indv_avgs|get_item:result.player.id|default:"-" }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7">No results found for {{ test_name }}.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <div class="pagination" style="margin-bottom:100px;">
-        {% if page_obj.has_previous %}
-            <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}">&laquo; First</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">&lt; Prev</a>
-        {% endif %}
-
-        {% for num in page_obj.paginator.page_range %}
-            {% if num == page_obj.number %}
-                <strong>{{ num }}</strong>
-            {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
-                <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
-            {% endif %}
-        {% endfor %}
-
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">Next &gt;</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}">Last &raquo;</a>
-        {% endif %}
+    <div class="page-header">
+        <h1 class="page-title">📊 {{ test_name }} Test Results</h1>
     </div>
 
+    <!-- Search & Filter Form -->
+    <form method="get" class="filter-form">
+        <div class="filter-row">
+
+            <div class="filter-group search-group">
+                <label class="filter-label">Search:</label>
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ search_query }}"
+                    placeholder="Player name..."
+                    class="filter-input"
+                >
+            </div>
+
+            {% if selected_date is not None %}
+            <div class="filter-group">
+                <label class="filter-label">Date:</label>
+                <input
+                    type="date"
+                    name="date"
+                    value="{{ selected_date }}"
+                    class="filter-input"
+                >
+            </div>
+            {% endif %}
+
+            {% if camps %}
+            <div class="filter-group">
+                <label class="filter-label">Camp:</label>
+                <select name="camp" class="filter-select">
+                    <option value="">All Camps</option>
+                    {% for camp in camps %}
+                        <option value="{{ camp.id }}" {% if selected_camp == camp.id|stringformat:"s" %}selected{% endif %}>
+                            {{ camp.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="filter-buttons">
+                <button type="submit" class="btn-search">Search</button>
+                <a href="{% url 'pushups_test_view' %}" class="btn-clear">Clear</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Results Count -->
+    {% if search_query or selected_camp or selected_date %}
+    <div class="results-info">
+        <strong>Showing {{ page_obj.paginator.count }} results</strong>
+        {% if search_query %}(searched "{{ search_query }}"){% endif %}
+        {% if selected_camp %}(camp ID: {{ selected_camp }}){% endif %}
+        {% if selected_date %}(date: {{ selected_date }}){% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Data Table -->
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="results-table" aria-describedby="results summary">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Player</th>
+                        <th>Date</th>
+                        <th>Phase</th>
+                        <th>Best</th>
+                        <th>Notes</th>
+                        <th>Individual Average</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in page_obj %}
+                    <tr>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td class="player-name"><strong>{{ result.player.name }}</strong></td>
+                        <td>{{ result.date }}</td>
+                        <td>{{ result.phase }}</td>
+                        <td class="best-score">{{ result.best }}</td>
+                        <td>{{ result.notes|default:"-" }}</td>
+                        <td class="average-value">{{ latest_indv_avgs|get_item:result.player.id|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr class="empty-row">
+                        <td colspan="7">No results found for {{ test_name }}.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-wrap">
+        <div class="pagination-row">
+            <div class="pagination-info">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} total results)
+            </div>
+
+            <div class="pagination-links">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" class="page-link-secondary">First</a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" class="page-link-primary">Previous</a>
+                {% endif %}
+
+                <span class="page-current">{{ page_obj.number }}</span>
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" class="page-link-primary">Next</a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" class="page-link-secondary">Last</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

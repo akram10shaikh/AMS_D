@@ -4,101 +4,165 @@
 
 {% block title %}Test Results{% endblock %}
 
-{% block extra_head %}
-    <style>
-        table { width: 90%; margin: 1em auto; border-collapse: collapse; }
-        th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
-        th { background-color: #f0f0f0; }
-        #searchInput {
-            width: 300px;
-            padding: 8px;
-            font-size: 16px;
-        }
-        .pagination {
-            text-align: center;
-            margin: 2em 0;
-        }
-        .pagination a, .pagination strong {
-            display: inline-block;
-            padding: 6px 12px;
-            margin: 0 2px;
-            border: 1px solid #ccc;
-            background: #f9f9f9;
-            color: #333;
-            text-decoration: none;
-        }
-        .pagination strong {
-            background: #e0e0e0;
-            font-weight: bold;
-        }
-        form.search-form {
-            text-align: center;
-            margin: 2em auto 1em auto;
-        }
-    </style>
-{% endblock %}
-
 {% block content %}
-    <h2 style="text-align:center;">{{ test_name }} Test Results</h2>
-
-    <form method="get" class="search-form" aria-label="Search Player Form">
-        <input type="text" name="search" id="searchInput" placeholder="Search player name..." value="{{ search_query }}">
-        <button type="submit">Search</button>
-    </form>
-
-    <p style="text-align:center; margin-top: 0.5em;">
-        Total rows: {{ total_results }}
-    </p>
-
-    <table id="resultsTable" aria-describedby="results summary">
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>Player</th>
-                <th>Date</th>
-                <th>Phase</th>
-                <th>Best</th>
-                <th>Notes</th>
-                <th>Individual Average</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for result in page_obj %}
-            <tr>
-                <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
-                <td class="player-name">{{ result.player.name }}</td>
-                <td>{{ result.date }}</td>
-                <td>{{ result.phase }}</td>
-                <td>{{ result.best }}</td>
-                <td>{{ result.notes|default:"-" }}</td>
-                <td>{{ latest_indv_avgs|get_item:result.player.id|default:"-" }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7">No results found for {{ test_name }}.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <div class="pagination" style="margin-bottom:100px;">
-        {% if page_obj.has_previous %}
-            <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}">&laquo; First</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">&lt; Prev</a>
-        {% endif %}
-
-        {% for num in page_obj.paginator.page_range %}
-            {% if num == page_obj.number %}
-                <strong>{{ num }}</strong>
-            {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
-                <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
-            {% endif %}
-        {% endfor %}
-
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">Next &gt;</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}">Last &raquo;</a>
-        {% endif %}
+<div class="report-page" style="max-width: 1200px; margin: 0 auto; padding: 20px; margin-bottom: 100px;">
+    
+    <div style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <h1 style="margin: 0; font-size: 28px; color: #333;">📊 {{ test_name }} Test Results</h1>
     </div>
 
+    <!-- Search & Filter Form -->
+    <form method="get" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e9ecef;">
+        <div style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
+            
+            <!-- Search -->
+            <div style="min-width: 300px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Search:</label>
+                <input 
+                    type="text" 
+                    name="search" 
+                    value="{{ search_query }}" 
+                    placeholder="Player name..." 
+                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                >
+            </div>
+
+            <!-- Date -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Date:</label>
+                <input 
+                    type="date" 
+                    name="date" 
+                    value="{{ selected_date }}" 
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                >
+            </div>
+
+            <!-- Camp -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Camp:</label>
+                <select 
+                    name="camp" 
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 200px;"
+                >
+                    <option value="">All Camps</option>
+                    {% for camp in camps %}
+                        <option value="{{ camp.id }}" {% if selected_camp == camp.id|stringformat:"s" %}selected{% endif %}>
+                            {{ camp.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Buttons -->
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" style="background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                    Search
+                </button>
+                <a href="{% url 'ten_meter_test_view' %}" style="background: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 14px; line-height: 1;">
+                    Clear
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Results Count -->
+    {% if search_query or selected_camp or selected_date %}
+    <div style="margin-bottom: 20px; padding: 12px; background: #e7f3ff; border-radius: 5px; border-left: 4px solid #007bff;">
+        <strong>Showing {{ page_obj.paginator.count }} results</strong>
+        {% if search_query %}(searched "{{ search_query }}"){% endif %}
+        {% if selected_camp %}(camp ID: {{ selected_camp }}) {% endif %}
+        {% if selected_date %}(date: {{ selected_date }}){% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Data Table -->
+    <div style="background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">No</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Player</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Date</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Phase</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Best</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Notes</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Individual Average</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in page_obj %}
+                <tr style="border-bottom: 1px solid #e9ecef;">
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ forloop.counter0|add:page_obj.start_index }}
+                    </td>
+                    <td style="padding: 15px 12px; font-weight: 500; color: #333;">
+                        <strong>{{ result.player.name }}</strong>
+                    </td>
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ result.date }}
+                    </td>
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ result.phase }}
+                    </td>
+                    <td style="padding: 15px 12px; font-weight: bold; color: #28a745; font-size: 16px;">
+                        {{ result.best }}
+                    </td>
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ result.notes|default:"-" }}
+                    </td>
+                    <td style="padding: 15px 12px; color: #888; font-size: 13px;">
+                        {{ latest_indv_avgs|get_item:result.player.id|default:"-" }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="padding: 40px; text-align: center; color: #6c757d; font-style: italic;">
+                        No results found for {{ test_name }}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div style="color: #666; font-size: 14px;">
+                Page {{ page_obj.number }} of {{ paginator.num_pages }} ({{ paginator.count }} total results)
+            </div>
+
+            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" 
+                       style="padding: 8px 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">
+                        First
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" 
+                       style="padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">
+                        Previous
+                    </a>
+                {% endif %}
+
+                <span style="padding: 8px 12px; background: #007bff; color: white; border-radius: 4px; font-weight: 500;">
+                    {{ page_obj.number }}
+                </span>
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" 
+                       style="padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">
+                        Next
+                    </a>
+                    <a href="?page={{ paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_camp %}&camp={{ selected_camp }}{% endif %}{% if selected_date %}&date={{ selected_date }}{% endif %}" 
+                       style="padding: 8px 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">
+                        Last
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

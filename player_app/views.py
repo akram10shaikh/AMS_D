@@ -4115,29 +4115,61 @@ def add_run_3x6_test(request):
 
 # Run A 3x6 test views
 def run_3x6_test_view(request):
-    test_name = 'Run A 3x6'
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use the dedicated model instead of TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = 'Run A 3x6'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         RunA3x6Test.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/runa3x6_data.html', context)
 
 # Glute Bridges Test views
@@ -4220,25 +4252,51 @@ def add_glute_bridges_test(request):
 
 # Glute Bridges Test Data views
 def glute_bridges_test_view(request):
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
+
+    user_org = getattr(request.user, "organization", None)
     test_name = "S/L Glute Bridges"
 
+    # Filters
     search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
 
     # Base queryset
     results = (
         SLGluteBridges.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Players actually present in the (possibly filtered) result set
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Players present in filtered result set
     player_ids = results.values_list('player_id', flat=True).distinct()
 
     # Get latest date per player where averages are present
@@ -4253,7 +4311,7 @@ def glute_bridges_test_view(request):
         .annotate(latest_date=Max('date'))
     )
 
-    # Map: player_id -> (avg_left, avg_right)
+    # Map: player_id -> {left, right}
     latest_indv_avgs = {}
     for entry in latest_dates:
         latest_result = (
@@ -4275,10 +4333,15 @@ def glute_bridges_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/glute_bridges_data.html', context)
 
 
@@ -4376,31 +4439,63 @@ def add_lunge_calf_raises_test(request):
 
 # List / data view
 def lunge_calf_raises_test_view(request):
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
+
+    user_org = getattr(request.user, "organization", None)
     test_name = 'S/L Lunge Calf Raises'
 
+    # Filters
     search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
 
-    # Use the dedicated model instead of TestAndResult
+    # Base queryset
     results = (
         SLLungeCalfRaises.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/lunge_calf_raises_data.html', context)
+
 
 
 
@@ -4501,29 +4596,61 @@ def add_mb_rotational_throw_test(request):
 
 # MB Rotational Throw Test Data views
 def mb_rotational_throw_test_view(request):
-    test_name = "MB Rotational Throws"
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use MBRotationalThrows model, not TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = "MB Rotational Throws"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         MBRotationalThrows.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/rotational_throws_data.html', context)
 
 
@@ -4621,28 +4748,61 @@ def add_copen_hagen_test(request):
     })
 
 def copen_hagen_test_view(request):
-    test_name = "Copenhagen"
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = "Copenhagen"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         CopenhagenTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/copen_hagen_data.html', context)
 
 
@@ -4743,29 +4903,61 @@ def add_sl_hop_test(request):
 
 # S/L Hop Test Data views
 def sl_hop_test_view(request):
-    test_name = "S/L Hop Test"
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use SLHopTest model instead of TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = "S/L Hop Test"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         SLHopTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/sl_hop_data.html', context)
 
 
@@ -4931,29 +5123,61 @@ def add_cmj_scores_test(request):
 
 # CMJ Test Data views
 def cmj_scores_test_view(request):
-    test_name = "CMJ Scores"
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use CMJTest model instead of TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = "CMJ Scores"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         CMJTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/cmj_scores_data.html', context)
 
 
@@ -5164,29 +5388,61 @@ def add_anthropometry_test(request):
 
 # Anthropometry Test Data views
 def anthropometry_test_view(request):
-    test_name = "Anthropometry Test"
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use AnthropometryTest model, not TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = "Anthropometry Test"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         AnthropometryTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/anthropometry_data.html', context)
 
 
@@ -5331,29 +5587,61 @@ def add_dexa_scan_test(request):
 
 # Dexa Scan Test Data views
 def dexa_scan_test_view(request):
-    test_name = "DEXA Scan Test"
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use DexaScanTest model instead of TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = "DEXA Scan Test"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         DexaScanTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/dexa_scan_data.html', context)
 
 # Blood Work Test views
@@ -5552,29 +5840,62 @@ def add_blood_test(request):
 
 
 # Blood Work Test Data views
-def blood_test_view(request,test_name=None):
-    search_query = request.GET.get('search', '').strip()
+def blood_test_view(request, test_name=None):
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use BloodTest model instead of TestAndResult
+    user_org = getattr(request.user, "organization", None)
+    test_name = test_name or "Blood Test"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         BloodTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/blood_work_data.html', context)
 
 
@@ -5671,25 +5992,53 @@ def add_runa3_test(request):
 
 
 def runa3_test_view(request):
-    test_name = 'Run A 3'
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = 'Run A 3'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         RunA3Test.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (from RunA3Test)
     latest_dates = (
         RunA3Test.objects
         .filter(
@@ -5709,6 +6058,7 @@ def runa3_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -5717,10 +6067,15 @@ def runa3_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/runa3_data.html', context)
 
 
@@ -5815,25 +6170,53 @@ def add_forty_meter_test(request):
     })
 
 def forty_meter_test_view(request):
-    test_name = '40m'
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = '40m'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         FortyMeterTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in model.save())
     latest_dates = (
         FortyMeterTest.objects
         .filter(
@@ -5853,6 +6236,7 @@ def forty_meter_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -5861,9 +6245,13 @@ def forty_meter_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
     return render(request, 'player_app/tests/forty_meter_data.html', context)
 
@@ -5961,25 +6349,53 @@ def add_twenty_meter_test(request):
 
 
 def twenty_meter_test_view(request):
-    test_name = '20m'
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = '20m'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         TwentyMeterTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in model.save())
     latest_dates = (
         TwentyMeterTest.objects
         .filter(
@@ -5999,6 +6415,7 @@ def twenty_meter_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6007,9 +6424,13 @@ def twenty_meter_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
     return render(request, 'player_app/tests/twenty_meter_data.html', context)
 
@@ -6111,25 +6532,50 @@ def ten_meter_test_view(request):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
 
+    user_org = getattr(request.user, "organization", None)
     test_name = '10m'
-    search_query = request.GET.get('search', '').strip()
 
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         TenMeterTest.objects
-        .select_related('player', 'phase', 'reported_by')
+        .select_related('player', 'phase', 'reported_by', 'phase')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in model.save())
     latest_dates = (
         TenMeterTest.objects
         .filter(
@@ -6149,6 +6595,7 @@ def ten_meter_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6157,9 +6604,13 @@ def ten_meter_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
     return render(request, 'player_app/tests/ten_meter_data.html', context)
 
@@ -6251,25 +6702,51 @@ def add_sbj_test(request):
 def sbj_test_view(request):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
-    test_name = 'SBJ'
-    search_query = request.GET.get('search', '').strip()
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = 'SBJ'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         SBJTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in SBJTest.save())
     latest_dates = (
         SBJTest.objects
         .filter(
@@ -6289,6 +6766,7 @@ def sbj_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6297,10 +6775,15 @@ def sbj_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/sbj_data.html', context)
 
 
@@ -6402,25 +6885,51 @@ def add_yoyo_test(request):
 def yoyo_test_view(request):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
-    test_name = 'YoYo Test'
-    search_query = request.GET.get('search', '').strip()
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = 'YoYo Test'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         YoYoTest.objects
-        .select_related('player', 'phase', 'reported_by')
+        .select_related('player', 'phase', 'reported_by', 'phase')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in YoYoTest.save())
     latest_dates = (
         YoYoTest.objects
         .filter(
@@ -6440,6 +6949,7 @@ def yoyo_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6448,9 +6958,13 @@ def yoyo_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
     return render(request, 'player_app/tests/yoyo_data.html', context)
 
@@ -6552,25 +7066,51 @@ def add_one_mile_test(request):
 def one_mile_test_view(request):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
-    test_name = '1 Mile'
-    search_query = request.GET.get('search', '').strip()
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = '1 Mile'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         OneMileTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in OneMileTest.save())
     latest_dates = (
         OneMileTest.objects
         .filter(
@@ -6590,6 +7130,7 @@ def one_mile_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6598,10 +7139,15 @@ def one_mile_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/one_mile_data.html', context)
 
 
@@ -6701,25 +7247,51 @@ def add_two_km_test(request):
 def two_km_test_view(request):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
-    test_name = '2 KM'
-    search_query = request.GET.get('search', '').strip()
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = '2 KM'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         TwoKmTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in TwoKmTest.save())
     latest_dates = (
         TwoKmTest.objects
         .filter(
@@ -6739,6 +7311,7 @@ def two_km_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6747,10 +7320,15 @@ def two_km_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/two_km_data.html', context)
 
 # Push-ups Test views
@@ -6840,25 +7418,51 @@ def add_pushups_test(request):
 def pushups_test_view(request):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
-    test_name = 'Push-ups'
-    search_query = request.GET.get('search', '').strip()
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = 'Push-ups'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     results = (
         PushUpsTest.objects
         .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
 
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(results, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    # Latest individual average per player
     player_ids = results.values_list('player_id', flat=True).distinct()
 
-    # latest per-player individual_average (computed in PushUpsTest.save())
     latest_dates = (
         PushUpsTest.objects
         .filter(
@@ -6878,6 +7482,7 @@ def pushups_test_view(request):
                 date=entry['latest_date'],
                 individual_average__isnull=False,
             )
+            .order_by('-id')
             .first()
         )
         if latest_result:
@@ -6886,10 +7491,15 @@ def pushups_test_view(request):
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'latest_indv_avgs': latest_indv_avgs,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/pushups_data.html', context)
 
 
@@ -7077,34 +7687,62 @@ def add_msk_injury_assessment(request):
     })
 
 def msk_injury_assessment_list(request):
-    
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
-    test_name = "MSK Injury Assessment"
-    search_query = request.GET.get('search', '').strip()
 
+    user_org = getattr(request.user, "organization", None)
+    test_name = "MSK Injury Assessment"
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
     qs = (
         MSKInjuryAssessment.objects
         .select_related('player', 'phase')
+        .filter(player__organization=user_org)
         .order_by('-date')
     )
 
+    # Search filter
     if search_query:
         qs = qs.filter(
-            models.Q(player__name__icontains=search_query) |
-            models.Q(physiotherapist_name__icontains=search_query)
+            Q(player__name__icontains=search_query) |
+            Q(physiotherapist_name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
         )
 
+    # Camp filter
+    if camp_id:
+        qs = qs.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        qs = qs.filter(date=date_str)
+
+    # Pagination
     paginator = Paginator(qs, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
         'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
+
     return render(request, 'player_app/tests/msk_injury_assessment_list.html', context)
 
 from django.http import Http404
@@ -7358,35 +7996,65 @@ def handle_wellness_submission(request, user_org):
 
 @login_required
 def daily_wellness_results_view(request):
-    """Results view with search and pagination (unchanged logic, improved)"""
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
+
     user_org = getattr(request.user, "organization", None)
-    
+    test_name = "Daily Wellness Test"
+
     if not user_org:
         messages.error(request, "No organization access")
         return redirect('dashboard')
-    
-    # Base queryset
-    qs = DailyWellnessTest.objects.select_related("player", "phase").filter(
-        player__organization=user_org
-    )
-    
-    # Search by player name
+
+    # Filters
     search_query = request.GET.get("search", "").strip()
+    camp_id = request.GET.get("camp", "").strip()
+    date_str = request.GET.get("date", "").strip()
+
+    # Base queryset
+    qs = (
+        DailyWellnessTest.objects
+        .select_related("player", "phase")
+        .filter(player__organization=user_org)
+        .order_by("-date", "-id")
+    )
+
+    # Search filter
     if search_query:
-        qs = qs.filter(Q(player__name__icontains=search_query))
-    
-    total_results = qs.count()
-    
+        qs = qs.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
+
+    # Camp filter
+    if camp_id:
+        qs = qs.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        qs = qs.filter(date=date_str)
+
     # Pagination
-    page_number = request.GET.get("page", 1)
-    paginator = Paginator(qs.order_by("-date", "-id"), 25)
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
-    
+
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by("name")
+
     context = {
+        "test_name": test_name,
         "page_obj": page_obj,
+        "paginator": paginator,
+        "total_results": paginator.count,
         "search_query": search_query,
-        "total_results": total_results,
+        "selected_camp": camp_id,
+        "selected_date": date_str,
+        "camps": camps,
     }
+
     return render(
         request,
         "player_app/tests/daily_wellness_results.html",
@@ -8878,31 +9546,70 @@ def save_attendance(request):
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 def camp_attendace_data(request):
-    
-    search_query = request.GET.get('search', '').strip()
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
 
-    # Use the dedicated model instead of TestAndResult
-    results = (
+    user_org = getattr(request.user, "organization", None)
+    test_name = "Camp Attendance"
+
+    if not user_org:
+        messages.error(request, "No organization access")
+        return redirect('dashboard')
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
+    qs = (
         PlayerAttendance.objects
         .select_related('player', 'camp')
-        .order_by('-attendance_date')
+        .filter(player__organization=user_org)
+        .order_by('-attendance_date', '-id')
     )
 
+    # Search filter
     if search_query:
-        results = results.filter(player__name__icontains=search_query)
+        qs = qs.filter(
+            Q(player__name__icontains=search_query) |
+            Q(camp__name__icontains=search_query)
+        )
 
-    paginator = Paginator(results, 20)
+    # Camp filter
+    if camp_id:
+        qs = qs.filter(camp_id=camp_id)
+
+    # Date filter
+    if date_str:
+        qs = qs.filter(attendance_date=date_str)
+
+    # Pagination
+    paginator = Paginator(qs, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
     context = {
-        
+        'test_name': test_name,
         'page_obj': page_obj,
+        'paginator': paginator,
         'total_results': paginator.count,
         'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
     }
-    return render(request, 'player_app/camps/camp_attendance_data.html', context)
 
+    return render(
+        request,
+        'player_app/camps/camp_attendance_data.html',
+        context
+    )
 
 @csrf_exempt
 @login_required
