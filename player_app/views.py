@@ -1666,7 +1666,7 @@ def phase_test(request,id):
         del request.session['phase_id_test']
 
     request.session['phase_id_test'] = id
-    print("session id :",request.session['phase_id_test'])
+    
     
     return render(request,"player_app/tests/phase_test.html",{"phase":phase})
 
