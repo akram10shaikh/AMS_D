@@ -272,6 +272,50 @@
     .camp-year-panel--hidden {
         display: none;
     }
+
+    .status-pill {
+    position: relative;
+    display: block;
+    margin-bottom: 8px;
+    background: rgba(54, 225, 86, 0.12);
+    color: #fff;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid rgba(54, 225, 86, 0.25);
+    }
+
+    .staff-pill {
+        background: rgba(0, 123, 255, 0.12);
+        border: 1px solid rgba(0, 123, 255, 0.25);
+    }
+
+    .custom-tooltip {
+        position: absolute;
+        left: 0;
+        top: calc(100% + 8px);
+        min-width: 220px;
+        max-width: 320px;
+        max-height: 220px;
+        overflow-y: auto;
+        background: #111;
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #333;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        display: none;
+        z-index: 9999;
+        font-size: 13px;
+        line-height: 1.5;
+        white-space: normal;
+    }
+
+    .tooltip-trigger:hover .custom-tooltip {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -335,9 +379,16 @@
              
              <!-- Hover info - hidden by default -->
              <div class="camp-hover-info">
-               <p><strong>👥 Players:</strong> <span class="count-placeholder">0</span></p>
-               <p><strong>👨‍💼 Staff:</strong> <span class="count-placeholder">0</span></p>
-             </div>
+                <div class="status-pill tooltip-trigger players-pill">
+                    <strong>👥 Players:</strong> <span class="player-count">0</span>
+                    <div class="custom-tooltip player-tooltip">No players</div>
+                </div>
+
+                <div class="status-pill tooltip-trigger staff-pill">
+                    <strong>👨‍💼 Staff:</strong> <span class="staff-count">0</span>
+                    <div class="custom-tooltip staff-tooltip">No staff</div>
+                </div>
+            </div>
            </div>
            <div class="camp-actions">
              <a href="{% url 'organization_camp_detail' camp.id %}" class="btn btn-primary">View</a>
@@ -355,54 +406,53 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
-  const yearTabs    = document.querySelectorAll('.camp-year-tab');
-  const yearPanels  = document.querySelectorAll('.camp-year-panel');
+  const yearTabs = document.querySelectorAll('.camp-year-tab');
+  const yearPanels = document.querySelectorAll('.camp-year-panel');
 
-  // Pre-loaded stats from Django context
   const campStatsData = {{ camp_stats|safe }};
 
-  // FIXED: Safe selectors for your HTML structure
   function loadCampStats(campId) {
     const card = document.querySelector(`[data-camp-id="${campId}"]`);
     if (!card) return;
 
-    // SAFE: Find spans within hover-info (your exact HTML structure)
-    const hoverInfo = card.querySelector('.camp-hover-info');
-    if (!hoverInfo) return;
+    const playerCountEl = card.querySelector('.player-count');
+    const staffCountEl = card.querySelector('.staff-count');
+    const playerTooltipEl = card.querySelector('.player-tooltip');
+    const staffTooltipEl = card.querySelector('.staff-tooltip');
 
-    const spans = hoverInfo.querySelectorAll('.count-placeholder');
-    if (spans.length < 2) return;
+    if (!playerCountEl || !staffCountEl || !playerTooltipEl || !staffTooltipEl) return;
 
-    const playerCountEl = spans[0];  // First span = Players
-    const staffCountEl = spans[1];   // Second span = Staff
-
-    // 1. Try pre-loaded server-side stats first (INSTANT!)
     if (campStatsData && campStatsData[campId]) {
-      playerCountEl.textContent = campStatsData[campId].player_count || 0;
-      staffCountEl.textContent = campStatsData[campId].staff_count || 0;
+      const stats = campStatsData[campId];
+      playerCountEl.textContent = stats.player_count || 0;
+      staffCountEl.textContent = stats.staff_count || 0;
+      playerTooltipEl.textContent = stats.player_names_text || 'No players';
+      staffTooltipEl.textContent = stats.staff_names_text || 'No staff';
       return;
     }
 
-    // 2. AJAX fallback
     fetch(`/organization/camp/${campId}/stats/`)
       .then(response => response.json())
       .then(data => {
         playerCountEl.textContent = data.player_count || 0;
         staffCountEl.textContent = data.staff_count || 0;
+        playerTooltipEl.textContent = data.player_names_text || 'No players';
+        staffTooltipEl.textContent = data.staff_names_text || 'No staff';
       })
       .catch(() => {
         playerCountEl.textContent = '0';
         staffCountEl.textContent = '0';
+        playerTooltipEl.textContent = 'No players';
+        staffTooltipEl.textContent = 'No staff';
       });
   }
 
-  // Load stats on card hover
   let hoverTimeout;
   document.querySelectorAll('.camp-card').forEach(card => {
     card.addEventListener('mouseenter', () => {
       const campId = card.dataset.campId;
       if (!campId) return;
-      
+
       clearTimeout(hoverTimeout);
       hoverTimeout = setTimeout(() => loadCampStats(campId), 100);
     });
@@ -433,6 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const year = tab.dataset.year;
       yearTabs.forEach(t => t.classList.remove('camp-year-tab--active'));
       tab.classList.add('camp-year-tab--active');
+
       yearPanels.forEach(panel => {
         const matches = panel.dataset.yearPanel === year;
         panel.classList.toggle('camp-year-panel--hidden', !matches);
@@ -442,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
       });
+
       filterBySearch();
     });
   });

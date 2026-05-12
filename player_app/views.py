@@ -1067,93 +1067,144 @@ def organization_injury_export(request):
 # Camps & Tournaments views
 def organization_camps_tournaments(request):
     """
-    Displays a list of camps/tournaments with player/staff counts on hover.
+    Displays a list of camps/tournaments with player/staff counts and names on hover.
     """
+    organizations = None
+
     # Super Admin: Sees all camps
     if request.user.is_superuser:
         organizations = Organization.objects.all()
         selected_org = request.GET.get('organization')
 
         if selected_org:
-            camps = CampTournament.objects.filter(organization_id=selected_org, is_deleted=False)
-            male_players = Player.objects.filter(organization_id=selected_org, gender='Male')
-            female_players = Player.objects.filter(organization_id=selected_org, gender='Female')
+            camps = CampTournament.objects.filter(
+                organization_id=selected_org,
+                is_deleted=False
+            )
+            male_players = Player.objects.filter(
+                organization_id=selected_org,
+                gender='Male'
+            )
+            female_players = Player.objects.filter(
+                organization_id=selected_org,
+                gender='Female'
+            )
         else:
             camps = CampTournament.objects.filter(is_deleted=False)
             male_players = Player.objects.filter(gender='Male')
             female_players = Player.objects.filter(gender='Female')
 
-    # Staff with permission: Sees all camps
+    # Staff with permission
     elif hasattr(request.user, 'staff') and request.user.staff.view_camps_tournaments:
         org = request.user.staff.organization
-        camps = CampTournament.objects.filter(is_deleted=False)
+        camps = CampTournament.objects.filter(
+            organization=org,
+            is_deleted=False
+        )
         male_players = Player.objects.filter(organization=org, gender='Male')
         female_players = Player.objects.filter(organization=org, gender='Female')
 
-    # Regular users: See only camps in their organization
+    # Regular users
     elif hasattr(request.user, 'organization') and request.user.organization:
         org = request.user.organization
-        camps = CampTournament.objects.filter(organization=org, is_deleted=False)
+        camps = CampTournament.objects.filter(
+            organization=org,
+            is_deleted=False
+        )
         male_players = Player.objects.filter(organization=org, gender='Male')
         female_players = Player.objects.filter(organization=org, gender='Female')
 
-    # No Access: Deny access
+    # No access
     else:
         return HttpResponseForbidden(
-            "You must belong to an organization or have the necessary permissions to view camps and tournaments.")
-    
-    camps_qs = camps.annotate(
+            "You must belong to an organization or have the necessary permissions to view camps and tournaments."
+        )
+
+    camps_qs = camps.prefetch_related(
+        'participants',
+        'staff_members'
+    ).annotate(
         year=ExtractYear('start_date')
     ).order_by('-start_date')
 
-    # Pre-calculate participant and staff counts for each camp (for performance)
     camp_stats = {}
     for camp in camps_qs:
-        player_count = camp.participants.count()
-        staff_count = camp.staff_members.count()
-        
-        
+        player_names = [
+            getattr(player, 'name', str(player))
+            for player in camp.participants.all()
+        ]
+        staff_names = [
+            getattr(staff, 'name', str(staff))
+            for staff in camp.staff_members.all()
+        ]
+
         camp_stats[camp.id] = {
-            'player_count': camp.participants.count(),
-            'staff_count': camp.staff_members.count()
+            'player_count': len(player_names),
+            'staff_count': len(staff_names),
+            'player_names': player_names,
+            'staff_names': staff_names,
+            'player_names_text': ", ".join(player_names) if player_names else "No players",
+            'staff_names_text': ", ".join(staff_names) if staff_names else "No staff",
         }
-        
-    # Group camps by year range (year to year+1)
+
     camps_by_range = defaultdict(list)
     for camp in camps_qs:
         year = camp.year
         range_key = f"{year}-{year + 1}" if year else "No Year"
         camps_by_range[range_key].append(camp)
 
-    # Sort year ranges descending
-    sorted_ranges = sorted(camps_by_range.items(), key=lambda x: int(x[0].split('-')[0]), reverse=True)
-    
+    sorted_ranges = sorted(
+        camps_by_range.items(),
+        key=lambda x: int(x[0].split('-')[0]) if x[0] != "No Year" else 0,
+        reverse=True
+    )
+
     context = {
-        'camps': camps,
+        'camps': camps_qs,
         'camps_by_range': dict(sorted_ranges),
         'male_players': male_players,
         'female_players': female_players,
-        'organizations': organizations if request.user.is_superuser else None,
-        'camp_stats': camp_stats  # Pass pre-calculated stats
+        'organizations': organizations,
+        'camp_stats': camp_stats,
     }
-    
-    return render(request, 'player_app/organization/organization_camps_tournaments.html', context)
+
+    return render(
+        request,
+        'player_app/organization/organization_camps_tournaments.html',
+        context
+    )
 
 
 def camp_stats(request, camp_id):
     """
-    Returns player and staff counts for a specific camp (AJAX endpoint).
+    Returns player/staff counts and full name lists for a specific camp.
     """
-    camp = get_object_or_404(CampTournament, id=camp_id, is_deleted=False)
-    
-    # Use exact model fields you provided
-    player_count = camp.participants.count()
-    staff_count = camp.staff_members.count()
+    camp = get_object_or_404(
+        CampTournament.objects.prefetch_related('participants', 'staff_members'),
+        id=camp_id,
+        is_deleted=False
+    )
+
+    player_names = [
+        getattr(player, 'name', str(player))
+        for player in camp.participants.all()
+    ]
+    staff_names = [
+        getattr(staff, 'name', str(staff))
+        for staff in camp.staff_members.all()
+    ]
+
+   
     
     return JsonResponse({
-        'player_count': player_count,
-        'staff_count': staff_count,
+        'player_count': len(player_names),
+        'staff_count': len(staff_names),
+        'player_names': player_names,
+        'staff_names': staff_names,
+        'player_names_text': ", ".join(player_names) if player_names else "No players",
+        'staff_names_text': ", ".join(staff_names) if staff_names else "No staff",
     })
+
 
 def organization_edit_camp(request, camp_id):
     camp = get_object_or_404(CampTournament, id=camp_id)
