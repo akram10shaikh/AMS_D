@@ -2017,7 +2017,7 @@ def wellness_dashboard(request):
         try:
             report_date = request.POST.get('report_date')
             camp_id = request.POST.get('camp')
-            print("Received POST data:", report_date, camp_id)
+            
             
             if not all([report_date, camp_id]):
                 return HttpResponseBadRequest("Missing required parameters")
@@ -2025,7 +2025,7 @@ def wellness_dashboard(request):
             # Parse single date
             selected_date = parser.parse(report_date).date()
             selected_camp = get_object_or_404(CampTournament, id=camp_id)
-            print(f"Parsed date: {selected_date}")
+            
             
             # Filter wellness logs for selected CAMP and EXACT date - ALL PLAYERS
             report_data = DailyWellnessTest.objects.filter(
@@ -2034,7 +2034,7 @@ def wellness_dashboard(request):
                 # ✅ Shows ALL players who submitted wellness for this camp/date
             ).select_related('player', 'phase').order_by('player__name')
             
-            print(f"Fetched {report_data.count()} wellness logs for camp {selected_camp.name} on {selected_date}")
+            
             
         except Exception as e:
             logger.error(f"Error processing report request: {e}")
