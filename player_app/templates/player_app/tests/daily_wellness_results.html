@@ -367,7 +367,7 @@
                         <th>No</th>
                         <th>Player</th>
                         <th>Date</th>
-                        <th>End Date</th>
+                        {% comment %} <th>End Date</th> {% endcomment %}
                         <th>Phase</th>
                         <th>Urine Color</th>
                         <th>Soreness (1–10)</th>
@@ -387,7 +387,7 @@
                         <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                         <td class="player-name"><strong>{{ result.player.name|default:"-" }}</strong></td>
                         <td>{{ result.date|date:"Y-m-d"|default:"-" }}</td>
-                        <td>{{ result.end_date|date:"Y-m-d"|default:"-" }}</td>
+                        {% comment %} <td>{{ result.end_date|date:"Y-m-d"|default:"-" }}</td> {% endcomment %}
                         <td>{{ result.phase.name|default:"-" }}</td>
                         <td class="metric-value">{{ result.get_urine_color_display|default:"-" }}</td>
                         <td class="metric-value">{{ result.soreness_level|default:"-" }}</td>

@@ -8861,7 +8861,7 @@ def player_report(request):
                 "player_app/record/player_test.html",
                 {"error": "No tests found for this player and date range"},
             )
-        print(tests)
+       
         stats_data_wellness = []
         for t in tests:
             stats_data_wellness.append(
