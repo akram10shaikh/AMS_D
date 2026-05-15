@@ -188,6 +188,7 @@ urlpatterns = [
                   path('msk-injury-assessment/', views.add_msk_injury_assessment, name='add_msk_injury_assessment'),
                   path('organization/<int:player_id>/all-tests/', views.organization_player_tests,name='organization_player_tests'),
                   path('daily-wellness/',views.daily_wellness_create_view,name='daily_wellness_create_view'),
+                  path('organization/daily-snc/',views.daily_activity_coach_log_all,name='daily_activity_coach_log_all'),
 
 
                   # Test Data View URLs
@@ -213,6 +214,7 @@ urlpatterns = [
                   path('msk-injury-assessment-list/', views.msk_injury_assessment_list, name='msk_injury_assessment_list'),
                   path('daily-wellness-view/',views.daily_wellness_results_view,name='daily_wellness_results_view'),
                   path('daily-wellness/filter-players/', views.filter_players_ajax, name='filter_players_ajax'),
+                  path("daily-snc-log-camps/",views.daily_snc_log_camps_view,name="daily_snc_log_camps_view"),
 
                   # Daily Activity of Coachs
                   path('daily-log/<int:id>/',views.daily_activity_coach_log,name='daily_activity_coach_log'),

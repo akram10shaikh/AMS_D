@@ -327,7 +327,7 @@
     <a href="{% url 'player_wellness_report_data' %}" class="btn btn-primary">Player Daily Wellness</a>
     <a href="{% url 'attendance_group_view' %}" class="btn btn-primary">Group Attendance</a>
     <a href="{% url 'wellness_dashboard' %}" class="btn btn-primary">Daily Wellness</a>
-    <a href="{% url 'snc_camps_dashboard' %}" class="btn btn-primary">All Daily S&C Coach's Log</a>
+    {% comment %} <a href="{% url 'snc_camps_dashboard' %}" class="btn btn-primary">All Daily S&C Coach's Log</a> {% endcomment %}
     <a href="{% url 'organization_create_camp' %}" class="btn btn-primary">Create New Camp</a>
     {% endif %}
 </div>

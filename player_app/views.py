@@ -1904,6 +1904,162 @@ def daily_activity_coach_log(request, id):
     )
 
 
+# Daily activity Test Dashboard
+def daily_activity_coach_log_all(request):
+  
+    camp = CampTournament.objects.all()
+    organization = get_object_or_404(Organization, user=request.user)
+    players_qs = Player.objects.filter(organization=organization)
+    physios_qs = Staff.objects.filter(organization=organization, role__iexact='Physio')
+    
+    if request.method == "POST":
+        with transaction.atomic():  # Ensure all data saves atomically
+            team = request.POST.get("team", "").strip()
+            coach_name = request.POST.get("coach_name", "").strip()
+            date = request.POST.get("session_date")
+            end_date = request.POST.get("session_date_end")
+            concerns = request.POST.get("concerns", "").strip()
+            
+            niggles_value = request.POST.get("niggles")
+            niggles = niggles_value == "yes"
+            
+            recovery_list = request.POST.getlist("recovery")
+            recovery_sessions = ",".join(recovery_list)
+            print("team ",team)
+            
+            if not (team and coach_name and date):
+                messages.error(request, "Team, coach name and date are required.")
+                return render(
+                    request,
+                    "player_app/camps/daily_activity_all.html",
+                    {
+                        "activities": ACTIVITY_NAMES, 
+                        "camp": camp, 
+                        "organization": organization,
+                        "players_qs": players_qs,
+                        "physios_qs": physios_qs,
+                    },
+                )
+            
+            teams = CampTournament.objects.get(id=team)
+            
+            # Create/update main log entry
+            log = DailySncLogCamps.objects.create(
+                team=teams,
+                date=date,
+                end_date=end_date,
+                user=request.user,
+                coach_name=coach_name,
+                concerns=concerns,
+                niggles=niggles,
+                recovery_sessions=recovery_sessions,
+            )
+                        
+            # Save activities
+            for activity_name in ACTIVITY_NAMES:
+                slug = _slugify_activity(activity_name)
+                duration_key = f"activities[{slug}][duration]"
+                intensity_key = f"activities[{slug}][intensity]"
+                
+                duration = request.POST.get(duration_key, "").strip()
+                intensity = request.POST.get(intensity_key, "").strip()
+                
+                if duration:  # Only save if duration selected
+                    DailyActivityCamps.objects.create(
+                        log=log,
+                        activity_name=activity_name,
+                        duration=duration,
+                        intensity=intensity,
+                    )
+            
+            # **NEW: Handle Injury Data when niggles == True**
+            if niggles:
+                player_id = request.POST.get('player')
+                reported_by_id = request.POST.get('reported_by')
+                injury_date = request.POST.get('injury_date')
+                name = request.POST.get('title')  # Title field
+                nature_of_injury = request.POST.get('nature_of_injury')
+                diagnosis_date = request.POST.get('diagnosis_date')
+                severity_rating = request.POST.get('severity')
+                venue = request.POST.get('venue')
+                type_of_activity = request.POST.get('type_of_activity')
+                notes = request.POST.get('notes')
+                action_taken = request.POST.get('action_taken')
+                player_status = request.POST.get('player_status')
+                expected_date_of_return = request.POST.get('expected_date_of_return')
+                side = request.POST.get('side')
+                camp_tournament = teams
+                team = teams
+                organization = organization
+                affected_body_parts = request.POST.getlist('affected_body_part')
+                
+              
+                phase_obj = get_object_or_404(CampTournament, id=teams.id)
+                player = get_object_or_404(Player, id=player_id)
+                
+               
+                # Staff → User
+                staff_obj = get_object_or_404(Staff, id=reported_by_id)
+                reported_by_user = staff_obj.user 
+                # Get affected body parts (handles multiple selections)
+                
+                
+                # Validate required injury fields
+                if player_id:  # Player & Title required
+                    try:
+                      
+                        injury = Injury.objects.create(
+                            player_id=player_id,
+                            reported_by_id=reported_by_id or None,
+                            injury_date=injury_date or None,
+                            name=name,
+                            nature_of_injury=nature_of_injury or '',
+                            diagnosis_date=diagnosis_date or None,
+                            severity_rating=severity_rating or 0,
+                            venue=venue or '',
+                            type_of_activity=type_of_activity or '',
+                            notes=notes or '',
+                            action_taken=action_taken or '',
+                            player_status=player_status or 'no participation',
+                            expected_date_of_return=expected_date_of_return or None,
+                            side=side or 'bilateral',
+                            camp_tournament_id=teams.id,
+                            affected_body_part=affected_body_parts,
+                            team=team,
+                        )
+                       
+                     
+
+                        
+                        # Save body parts (assuming Injury model has ManyToMany or JSONField)
+                        
+                        messages.success(request, f"Daily log AND injury report saved successfully!")
+                        
+                    except Exception as e:
+                        
+                        messages.error(request, f"Injury save failed: {str(e)}")
+                else:
+                    messages.warning(request, "Injury reported but missing required fields (Player/Title). Log saved.")
+            
+            else:
+                messages.success(request, "Daily S&C camp log saved.")
+            
+            return redirect("daily_activity_coach_log_all")
+    
+    # GET request - render form
+    return render(
+        request,
+        "player_app/camps/daily_activity_all.html",
+        {
+            "activities": ACTIVITY_NAMES,
+            "camp": camp,
+            "organization": organization,
+            "players_qs": players_qs,
+            "physios_qs": physios_qs,
+        },
+    )
+
+
 # Daily Activity log view page
 def daily_snc_camp_detail(request, pk):
     log = get_object_or_404(DailySncLogCamps, pk=pk)

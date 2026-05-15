@@ -194,13 +194,20 @@
                 <td><a href="{% url 'bowlerdrills_list' %}" class="btn view-btn" aria-label="Add New Test Result">View</a></td>
                 <td><a href="{% url 'player_drill_report_new' %}" class="btn view-btn" aria-label="View Test Report">Report</a></td>
             </tr>
-                <tr>
+            <tr>
                     <td>24</td>
+                    <td>Daily Coach Summary</td>
+                    <td><a href="{% url 'daily_activity_coach_log_all'  %}" class="btn add-btn" aria-label="Add New Test Result">Add New Test Result</a></td>
+                    <td><a href="{% url 'daily_snc_log_camps_view' %}" class="btn view-btn" aria-label="Add New Test Result">View</a></td>
+                    <td><a href="{% url 'snc_camps_dashboard' %}" class="btn view-btn" aria-label="View Player Records">Report</a></td>
+            </tr>
+            <tr>
+                    <td>25</td>
                     <td>Multi Test Result</td>
                     <td></td>
                     <td></td>
                     <td><a href="{% url 'multi_test_report' %}" class="btn view-btn" aria-label="View Test Report">Report</a></td>
-                </tr>
+            </tr>
         </tbody>
     </table>
     <br>
