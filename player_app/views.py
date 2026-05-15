@@ -2060,6 +2060,70 @@ def daily_activity_coach_log_all(request):
     )
 
 
+# Daily S&C Camp Logs - List view with search, filter, pagination in the test dashboard
+def daily_snc_log_camps_view(request):
+    user_org = getattr(request.user, "organization", None)
+
+    search_query = request.GET.get("search", "").strip()
+    camp_id = request.GET.get("camp", "").strip()
+    date_str = request.GET.get("date", "").strip()
+
+    logs = (
+        DailySncLogCamps.objects
+        .select_related("team", "user")
+        .prefetch_related("activities")
+        .filter(team__participants__organization=user_org)
+        .distinct()
+        .order_by("-date", "-created_at")
+    )
+
+    if search_query:
+        logs = logs.filter(
+            Q(team__name__icontains=search_query) |
+            Q(coach_name__icontains=search_query) |
+            Q(concerns__icontains=search_query) |
+            Q(activities__activity_name__icontains=search_query)
+        ).distinct()
+
+    if camp_id:
+        logs = logs.filter(team_id=camp_id)
+
+    if date_str:
+        logs = logs.filter(date=date_str)
+
+    paginator = Paginator(logs, 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    camps = (
+        CampTournament.objects
+        .filter(participants__organization=user_org)
+        .distinct()
+        .order_by("name")
+    )
+
+    for log in page_obj:
+        if log.recovery_sessions:
+            log.recovery_sessions_list = [
+                item.strip().replace("_", " ").title()
+                for item in log.recovery_sessions.split(",")
+                if item.strip()
+            ]
+        else:
+            log.recovery_sessions_list = []
+
+    context = {
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "search_query": search_query,
+        "selected_camp": camp_id,
+        "selected_date": date_str,
+        "camps": camps,
+        "page_title": "Daily SNC Camp Logs",
+    }
+    return render(request, "player_app/tests/daily_snc_log_camps_data.html", context)
+
+
 # Daily Activity log view page
 def daily_snc_camp_detail(request, pk):
     log = get_object_or_404(DailySncLogCamps, pk=pk)
