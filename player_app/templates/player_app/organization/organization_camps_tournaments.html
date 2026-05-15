@@ -410,6 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const yearPanels = document.querySelectorAll('.camp-year-panel');
 
   const campStatsData = {{ camp_stats|safe }};
+  let activeYear = document.querySelector('.camp-year-tab--active')?.dataset.year || '';
 
   function loadCampStats(campId) {
     const card = document.querySelector(`[data-camp-id="${campId}"]`);
@@ -462,45 +463,70 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  function resetToActiveTab() {
+    yearTabs.forEach(tab => {
+      tab.classList.toggle('camp-year-tab--active', tab.dataset.year === activeYear);
+    });
+
+    yearPanels.forEach(panel => {
+      const isActive = panel.dataset.yearPanel === activeYear;
+      panel.classList.toggle('camp-year-panel--hidden', !isActive);
+
+      panel.querySelectorAll('.camp-card').forEach(card => {
+        card.style.display = 'inline-block';
+      });
+    });
+  }
+
   function filterBySearch() {
     const q = (searchInput.value || '').toLowerCase().trim();
+
+    if (!q) {
+      resetToActiveTab();
+      return;
+    }
+
+    yearTabs.forEach(tab => tab.classList.remove('camp-year-tab--active'));
+
     yearPanels.forEach(panel => {
-      if (panel.classList.contains('camp-year-panel--hidden')) return;
       const cards = panel.querySelectorAll('.camp-card');
+      let hasMatch = false;
+
       cards.forEach(card => {
-        const name = card.querySelector('.camp-card-header').textContent.toLowerCase();
-        card.style.display = (!q || name.includes(q)) ? 'inline-block' : 'none';
+        const name = card.querySelector('.camp-card-header')?.textContent.toLowerCase() || '';
+        const body = card.querySelector('.camp-card-body')?.textContent.toLowerCase() || '';
+        const matches = name.includes(q) || body.includes(q);
+
+        card.style.display = matches ? 'inline-block' : 'none';
+
+        if (matches) {
+          hasMatch = true;
+        }
       });
+
+      panel.classList.toggle('camp-year-panel--hidden', !hasMatch);
     });
   }
 
   if (searchInput) {
-    searchInput.addEventListener('keyup', filterBySearch);
+    searchInput.addEventListener('input', filterBySearch);
   }
 
   yearTabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      const year = tab.dataset.year;
-      yearTabs.forEach(t => t.classList.remove('camp-year-tab--active'));
-      tab.classList.add('camp-year-tab--active');
+      activeYear = tab.dataset.year;
 
-      yearPanels.forEach(panel => {
-        const matches = panel.dataset.yearPanel === year;
-        panel.classList.toggle('camp-year-panel--hidden', !matches);
-        if (matches) {
-          panel.querySelectorAll('.camp-card').forEach(card => {
-            card.style.display = 'inline-block';
-          });
-        }
-      });
+      if ((searchInput.value || '').trim()) {
+        filterBySearch();
+        return;
+      }
 
-      filterBySearch();
+      resetToActiveTab();
     });
   });
 
-  filterBySearch();
+  resetToActiveTab();
 });
 </script>
-
 
 {% endblock %}
