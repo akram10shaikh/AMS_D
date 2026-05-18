@@ -6352,9 +6352,9 @@ def add_forty_meter_test(request):
             player = get_object_or_404(Player, pk=player_id)
 
             # NomativeData lookup
-            nomative_data = get_object_or_404(NomativeData, final_level=best_val)
-            total_distance = nomative_data.total_distance
-            approximately_vo2max = nomative_data.approximately_vo2max
+            # nomative_data = get_object_or_404(NomativeData, final_level=best_val)
+            # total_distance = nomative_data.total_distance
+            # approximately_vo2max = nomative_data.approximately_vo2max
 
             # Staff → User
             staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
@@ -6366,8 +6366,8 @@ def add_forty_meter_test(request):
                 phase=phase_obj,
                 best=best_val,
                 notes=notes,
-                distance_covered=total_distance,
-                predicted_vo2max=approximately_vo2max,
+                # distance_covered=total_distance,
+                # predicted_vo2max=approximately_vo2max,
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
@@ -6377,7 +6377,7 @@ def add_forty_meter_test(request):
                 phase=phase_obj,
                 actor=reported_by_user,
                 activity_type='Test Added',
-                details=f'Added 40m test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'
+                details=f'Added 40m test with Best: {best_val}'
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))           
@@ -6529,9 +6529,9 @@ def add_twenty_meter_test(request):
             player = get_object_or_404(Player, pk=player_id)
 
             # NomativeData lookup (same logic you used for RunA3/40m)
-            nomative_data = get_object_or_404(NomativeData, final_level=best_val)
-            total_distance = nomative_data.total_distance
-            approximately_vo2max = nomative_data.approximately_vo2max
+            # nomative_data = get_object_or_404(NomativeData, final_level=best_val)
+            # total_distance = nomative_data.total_distance
+            # approximately_vo2max = nomative_data.approximately_vo2max
 
             # Staff → User
             staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
@@ -6543,8 +6543,8 @@ def add_twenty_meter_test(request):
                 phase=phase_obj,
                 best=best_val,
                 notes=notes,
-                distance_covered=total_distance,
-                predicted_vo2max=approximately_vo2max,
+                # distance_covered=total_distance,
+                # predicted_vo2max=approximately_vo2max,
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
@@ -6554,7 +6554,7 @@ def add_twenty_meter_test(request):
                 phase=phase_obj,
                 actor=reported_by_user,
                 activity_type='Test Added',
-                details=f'Added 20m test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'   
+                details=f'Added 20m test with Best: {best_val}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -7241,13 +7241,13 @@ def add_one_mile_test(request):
             player = get_object_or_404(Player, pk=player_id)
 
             # Optional: if you have a NomativeData mapping for 1 Mile
-            try:
-                nomative_data = NomativeData.objects.get(final_level=best_val)
-                total_distance = nomative_data.total_distance
-                approximately_vo2max = nomative_data.approximately_vo2max
-            except NomativeData.DoesNotExist:
-                total_distance = None
-                approximately_vo2max = None
+            # try:
+            #     nomative_data = NomativeData.objects.get(final_level=best_val)
+            #     total_distance = nomative_data.total_distance
+            #     approximately_vo2max = nomative_data.approximately_vo2max
+            # except NomativeData.DoesNotExist:
+            #     total_distance = None
+            #     approximately_vo2max = None
 
             # Staff → User
             staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
@@ -7259,8 +7259,8 @@ def add_one_mile_test(request):
                 phase=phase_obj,
                 best=best_val,
                 notes=notes,
-                distance_covered=total_distance,
-                predicted_vo2max=approximately_vo2max,
+                # distance_covered=total_distance,
+                # predicted_vo2max=approximately_vo2max,
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
@@ -7270,7 +7270,7 @@ def add_one_mile_test(request):
                 phase=phase_obj,
                 actor=reported_by_user,
                 activity_type='Test Added',
-                details=f'Added 1 Mile test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'   
+                details=f'Added 1 Mile test with Best: {best_val}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
@@ -7423,13 +7423,13 @@ def add_two_km_test(request):
             player = get_object_or_404(Player, pk=player_id)
 
             # Optional: NomativeData mapping for 2 KM
-            try:
-                nomative_data = NomativeData.objects.get(final_level=best_val)
-                total_distance = nomative_data.total_distance
-                approximately_vo2max = nomative_data.approximately_vo2max
-            except NomativeData.DoesNotExist:
-                total_distance = None
-                approximately_vo2max = None
+            # try:
+            #     nomative_data = NomativeData.objects.get(final_level=best_val)
+            #     total_distance = nomative_data.total_distance
+            #     approximately_vo2max = nomative_data.approximately_vo2max
+            # except NomativeData.DoesNotExist:
+            #     total_distance = None
+            #     approximately_vo2max = None
 
             # Staff → User
             staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
@@ -7441,8 +7441,8 @@ def add_two_km_test(request):
                 phase=phase_obj,
                 best=best_val,
                 notes=notes,
-                distance_covered=total_distance,
-                predicted_vo2max=approximately_vo2max,
+                # distance_covered=total_distance,
+                # predicted_vo2max=approximately_vo2max,
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
@@ -7452,7 +7452,7 @@ def add_two_km_test(request):
                 phase=phase_obj,
                 actor=reported_by_user,
                 activity_type='Test Added',
-                details=f'Added 2 KM test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'
+                details=f'Added 2 KM test with Best: {best_val}'
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
