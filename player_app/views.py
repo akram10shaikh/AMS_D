@@ -9971,72 +9971,120 @@ def bowlerdrills_create(request, camp_id=None):
     user_org = getattr(request.user, "organization", None)
     if not user_org:
         return redirect('dashboard')
-    
-    # Get camps for dropdown
+
     camps = CampTournament.objects.filter(
-        organization=user_org, 
-        
+        organization=user_org
     ).order_by('name')
-    
-    # Get players based on selected camp (if any)
+
     players = Player.objects.none()
+    selected_camp = None
     selected_camp_id = camp_id
-    
-    selected_camp =  camp = get_object_or_404(
-            CampTournament, 
-            id=camp_id, 
-            organization=user_org, 
-            
-        )
+
     if camp_id:
-        camp = get_object_or_404(
-            CampTournament, 
-            id=camp_id, 
-            organization=user_org, 
-            
+        selected_camp = get_object_or_404(
+            CampTournament,
+            id=camp_id,
+            organization=user_org
         )
-        players = camp.participants.filter(organization=user_org,role__in=['Bowler','All-rounder']).order_by('name')
-        selected_camp_id = camp_id
-    
+        players = selected_camp.participants.filter(
+            organization=user_org,
+            role__in=['Bowler', 'All-rounder']
+        ).order_by('name')
+
     if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                camp_id = request.POST.get('camp')
-                date = request.POST.get('date')
-                
-                if not camp_id or not date:
-                    return JsonResponse({'success': False, 'error': 'Camp and date are required'}, status=400)
-                
-                created_drills = []
-                # Process all players' data
-                for player in players:
-                    balls_key = f'balls_{player.id}'
-                    balls_bowled = request.POST.get(balls_key)
-                    
-                    if balls_bowled and int(balls_bowled) >= 0:
-                        BowlerDrill.objects.create(
-                            player_id=player.id,
-                            camp_id=camp_id,
-                            date=date,
-                            no_balls=int(balls_bowled)
-                        )
-                        created_drills.append(player.name)
-                
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': True, 
-                        'count': len(created_drills),
-                        'players': created_drills
-                    })
-            
-            return redirect('bowlerdrills_create',camp_id=camp_id)
-            
-        except Exception as e:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'error': str(e)}, status=400)
-    
+        action = request.POST.get('action')
+        posted_camp_id = request.POST.get('camp')
+        date = request.POST.get('date')
+
+        if not posted_camp_id or not date:
+            return JsonResponse(
+                {'success': False, 'error': 'Camp and date are required'},
+                status=400
+            )
+
+        camp = get_object_or_404(
+            CampTournament,
+            id=posted_camp_id,
+            organization=user_org
+        )
+
+        players = camp.participants.filter(
+            organization=user_org,
+            role__in=['Bowler', 'All-rounder']
+        ).order_by('name')
+
+        # FETCH EXISTING DATA
+        if action == 'fetch':
+            existing_drills = BowlerDrill.objects.filter(
+                camp_id=posted_camp_id,
+                date=date,
+                player__organization=user_org
+            ).select_related('player')
+
+            drill_map = {
+                drill.player_id: drill.no_balls
+                for drill in existing_drills
+            }
+
+            player_data = []
+            for player in players:
+                player_data.append({
+                    'id': player.id,
+                    'name': player.name,
+                    'balls': drill_map.get(player.id, '')
+                })
+
+            return JsonResponse({
+                'success': True,
+                'players': player_data,
+                'exists': existing_drills.exists(),
+                'message': 'Existing drills loaded.' if existing_drills.exists() else 'No drills found for selected date. You can add new data.'
+            })
+
+        # SAVE / UPDATE DATA
+        if action == 'save':
+            try:
+                with transaction.atomic():
+                    saved_players = []
+
+                    for player in players:
+                        balls_key = f'balls_{player.id}'
+                        balls_bowled = request.POST.get(balls_key)
+
+                        if balls_bowled is not None and balls_bowled != '':
+                            balls_bowled = int(balls_bowled)
+
+                            if balls_bowled < 0:
+                                continue
+
+                            BowlerDrill.objects.update_or_create(
+                                player_id=player.id,
+                                camp_id=posted_camp_id,
+                                date=date,
+                                defaults={
+                                    'no_balls': balls_bowled
+                                }
+                            )
+                            saved_players.append(player.name)
+
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': True,
+                            'count': len(saved_players),
+                            'players': saved_players,
+                            'message': 'Drills saved successfully'
+                        })
+
+                    return redirect('bowlerdrills_create', camp_id=posted_camp_id)
+
+            except Exception as e:
+                return JsonResponse(
+                    {'success': False, 'error': str(e)},
+                    status=400
+                )
+
     context = {
-        'selected_camp':selected_camp,
+        'selected_camp': selected_camp,
         'camps': camps,
         'players': players,
         'selected_camp_id': selected_camp_id,
