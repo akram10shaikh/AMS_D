@@ -125,7 +125,7 @@
         </div>
             <div class="form-group">
                 <label for="date">Date:</label>
-                <input type="date" id="date" name="date" required>
+                <input type="date" id="date" name="date" >
             </div>
              <div class="form-group">
                 <label for="phase">Phase:</label>
@@ -146,7 +146,7 @@
                         {% endif %}
                     {% endfor %}
                 {% else %}
-                    <select id="phase" name="phase" required>
+                    <select id="phase" name="phase" >
                         <option value="">---------</option>
                         {% for event in events %}
                             <option value="{{ event.id }}">{{ event.name }}</option>
@@ -159,32 +159,32 @@
 
                     <div class="form-group">
                         <label>Haemoglobin (13–17 g/dL):</label>
-                        <input type="number" step="0.1" id="bw_haemoglobin" name="blood_hemoglobin" placeholder="e.g. 14.5">
+                        <input type="number" step="0.001" id="bw_haemoglobin" name="blood_hemoglobin" placeholder="e.g. 14.5">
                     </div>
 
                     <div class="form-group">
                         <label>RBC Count (4.5–5.5 million/cumm):</label>
-                        <input type="number" step="0.01" id="bw_rbc" name="blood_rbc" placeholder="e.g. 5.0">
+                        <input type="number" step="0.001" id="bw_rbc" name="blood_rbc" placeholder="e.g. 5.0">
                     </div>
 
                     <div class="form-group">
                         <label>Platelet Count (1.50–4.00 lakhs/cumm):</label>
-                        <input type="number" step="0.01" id="bw_platelets" name="blood_platelets" placeholder="e.g. 2.50">
+                        <input type="number" step="0.001" id="bw_platelets" name="blood_platelets" placeholder="e.g. 2.50">
                     </div>
 
                     <div class="form-group">
                         <label>Albumin (3.5–5.2 g/dL):</label>
-                        <input type="number" step="0.1" id="bw_albumin" name="blood_albumin" placeholder="e.g. 4.2">
+                        <input type="number" step="0.001" id="bw_albumin" name="blood_albumin" placeholder="e.g. 4.2">
                     </div>
 
                     <div class="form-group">
                         <label>Globulin (2.5–3.5 g/dL):</label>
-                        <input type="number" step="0.1" id="bw_globulin" name="blood_globulin" placeholder="e.g. 3.0">
+                        <input type="number" step="0.001" id="bw_globulin" name="blood_globulin" placeholder="e.g. 3.0">
                     </div>
 
                     <div class="form-group">
                         <label>Uric Acid (3.4–7.0 mg/dL):</label>
-                        <input type="number" step="0.1" id="bw_uric_acid" name="blood_uric_acid" placeholder="e.g. 5.6">
+                        <input type="number" step="0.001" id="bw_uric_acid" name="blood_uric_acid" placeholder="e.g. 5.6">
                     </div>
 
                     <div class="form-group">
@@ -194,62 +194,62 @@
 
                     <div class="form-group">
                         <label>Testosterone (2.8–8.0 ng/mL):</label>
-                        <input type="number" step="0.1" id="bw_testosterone" name="blood_testosterone" placeholder="e.g. 5.2">
+                        <input type="number" step="0.001" id="bw_testosterone" name="blood_testosterone" placeholder="e.g. 5.2">
                     </div>
 
                     <div class="form-group">
                         <label>Iron (60–160 µg/dL):</label>
-                        <input type="number" step="1" id="bw_iron" name="blood_iron" placeholder="e.g. 95">
+                        <input type="number" step="0.001" id="bw_iron" name="blood_iron" placeholder="e.g. 95">
                     </div>
 
                     <div class="form-group">
                         <label>Vitamin D3 (30–100 ng/mL):</label>
-                        <input type="number" step="1" id="bw_vitd3" name="blood_vitamin_d3" placeholder="e.g. 45">
+                        <input type="number" step="0.001" id="bw_vitd3" name="blood_vitamin_d3" placeholder="e.g. 45">
                     </div>
 
                     <div class="form-group">
                         <label>Cholesterol (&lt;200 mg/dL):</label>
-                        <input type="number" step="1" id="bw_cholesterol" name="blood_cholesterol" placeholder="e.g. 180">
+                        <input type="number" step="0.001" id="bw_cholesterol" name="blood_cholesterol" placeholder="e.g. 180">
                     </div>
 
                     <div class="form-group">
                         <label>HDL (&gt;60 mg/dL):</label>
-                        <input type="number" step="1" id="bw_hdl" name="blood_hdl" placeholder="e.g. 55">
+                        <input type="number" step="0.001" id="bw_hdl" name="blood_hdl" placeholder="e.g. 55">
                     </div>
 
                     <div class="form-group">
                         <label>LDL (&lt;100 mg/dL):</label>
-                        <input type="number" step="1" id="bw_ldl" name="blood_ldl" placeholder="e.g. 90">
+                        <input type="number" step="0.001" id="bw_ldl" name="blood_ldl" placeholder="e.g. 90">
                     </div>
 
                     <div class="form-group">
                         <label>LDL/HDL Ratio (&lt;3.5):</label>
-                        <input type="number" step="0.01" id="bw_ldl_hdl_ratio" name="blood_ldl_hdl_ratio" placeholder="e.g. 2.5">
+                        <input type="number" step="0.001" id="bw_ldl_hdl_ratio" name="blood_ldl_hdl_ratio" placeholder="e.g. 2.5">
                     </div>
 
                     <div class="form-group">
                         <label>Vitamin B12 (197–771 pg/mL):</label>
-                        <input type="number" step="1" id="bw_b12" name="blood_vitamin_b12" placeholder="e.g. 350">
+                        <input type="number" step="0.001" id="bw_b12" name="blood_vitamin_b12" placeholder="e.g. 350">
                     </div>
 
                     <div class="form-group">
                         <label>Lipoprotein (&lt;30 mg/dL):</label>
-                        <input type="number" step="0.1" id="bw_lipoprotein" name="blood_lipoprotein" placeholder="e.g. 20">
+                        <input type="number" step="0.001" id="bw_lipoprotein" name="blood_lipoprotein" placeholder="e.g. 20">
                     </div>
 
                     <div class="form-group">
                         <label>Homocysteine (5.2–11.4 µmol/L):</label>
-                        <input type="number" step="0.1" id="bw_homocysteine" name="blood_homocysteine" placeholder="e.g. 8.5">
+                        <input type="number" step="0.001" id="bw_homocysteine" name="blood_homocysteine" placeholder="e.g. 8.5">
                     </div>
 
                     <div class="form-group">
                         <label>Protein (6.4–8.3 g/dL):</label>
-                        <input type="number" step="0.1" id="bw_protein" name="blood_protein" placeholder="e.g. 7.2">
+                        <input type="number" step="0.001" id="bw_protein" name="blood_protein" placeholder="e.g. 7.2">
                     </div>
 
                     <div class="form-group">
                         <label>T3 (80–200 ng/dL):</label>
-                        <input type="number" step="1" id="bw_t3" name="blood_t3" placeholder="e.g. 120">
+                        <input type="number" step="0.001" id="bw_t3" name="blood_t3" placeholder="e.g. 120">
                     </div>
 
                     <div class="form-group">
@@ -259,7 +259,7 @@
 
                     <div class="form-group">
                         <label>TSH (0.27–4.2 µIU/mL):</label>
-                        <input type="number" step="0.01" id="bw_tsh" name="blood_tsh" placeholder="e.g. 2.1">
+                        <input type="number" step="0.001" id="bw_tsh" name="blood_tsh" placeholder="e.g. 2.1">
                     </div>
 
 
@@ -270,7 +270,7 @@
             </div>
             <div class="form-group">
                 <label for="reported_by">Reported by:</label>
-                <select id="reported_by" name="reported_by" required>
+                <select id="reported_by" name="reported_by">
                     <option value="">---------</option>
                     {% for s in staff %}
                         <option value="{{ s.id }}">{{ s.name }}</option>
