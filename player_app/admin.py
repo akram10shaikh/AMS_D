@@ -41,6 +41,7 @@ admin.site.register(Category)
 admin.site.register(DailyActivityCamps)
 admin.site.register(DailySncLogCamps)
 
+from player_app.models import DexaScanTest
 
 admin.site.register(SLGluteBridges)
 admin.site.register(SLLungeCalfRaises)
