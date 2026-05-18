@@ -5775,8 +5775,7 @@ def add_dexa_scan_test(request):
             errors.append("Dexa Lean is required.")
         if not dexa_lean_mass:
             errors.append("Dexa Lean Mass is required.")
-        if not dexa_testosterone:
-            errors.append("Dexa Testosterone is required.")
+       
         if not reported_by_staff_id:
             errors.append("Reported by is required.")
 
