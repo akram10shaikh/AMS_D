@@ -1236,8 +1236,7 @@ def organization_edit_camp(request, camp_id):
         raw_staff_ids = [id.strip() for id in staff_ids_str.split(',') if id.strip()]
         new_staff_ids = list(set(int(id) for id in raw_staff_ids if id.isdigit()))  # UNIQUE IDs
 
-        print(f"Clean new players: {new_participant_ids}")
-        print(f"Clean new staff: {new_staff_ids}")
+      
 
         # === UPDATE BASIC FIELDS ===
         camp.name = request.POST.get('name', '')
@@ -1254,11 +1253,7 @@ def organization_edit_camp(request, camp_id):
         added_staff = set(new_staff_ids) - old_staff_ids
         removed_staff = old_staff_ids - set(new_staff_ids)
 
-        print(f"✅ Added players: {added_players}")
-        print(f"❌ Removed players: {removed_players}")
-        print(f"✅ Added staff: {added_staff}")
-        print(f"❌ Removed staff: {removed_staff}")
-
+       
         # === APPLY CHANGES ===
         camp.participants.set(participants.filter(id__in=new_participant_ids))
         if staff_field_name:
