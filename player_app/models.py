@@ -3882,3 +3882,30 @@ class BowlerDrill(models.Model):
     def __str__(self):
         return f"{self.player.name} {self.date}"
     
+
+
+class NordbordTest(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.CASCADE)
+    date = models.DateField(null=True)
+    phase = models.ForeignKey(CampTournament, on_delete=models.CASCADE, null=True)
+    
+    nordic_right = models.FloatField(null=True, blank=True)
+    nordic_left = models.FloatField(null=True, blank=True)
+    nordic_imbalance = models.FloatField(null=True, blank=True)
+
+    isoprone_right = models.FloatField(null=True, blank=True)
+    isoprone_left = models.FloatField(null=True, blank=True)
+    isoprone_imbalance = models.FloatField(null=True, blank=True)
+
+
+    reported_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='nordbord_reports')
+    
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+
+    def __str__(self):
+        return f"{self.player.name} - {self.phase.name}"
+    
+

@@ -189,6 +189,7 @@ urlpatterns = [
                   path('organization/<int:player_id>/all-tests/', views.organization_player_tests,name='organization_player_tests'),
                   path('daily-wellness/',views.daily_wellness_create_view,name='daily_wellness_create_view'),
                   path('organization/daily-snc/',views.daily_activity_coach_log_all,name='daily_activity_coach_log_all'),
+                  path('nordbord-test/add/', views.add_nordbord_test, name='add_nordbord_test'),
 
 
                   # Test Data View URLs
@@ -215,6 +216,7 @@ urlpatterns = [
                   path('daily-wellness-view/',views.daily_wellness_results_view,name='daily_wellness_results_view'),
                   path('daily-wellness/filter-players/', views.filter_players_ajax, name='filter_players_ajax'),
                   path("daily-snc-log-camps/",views.daily_snc_log_camps_view,name="daily_snc_log_camps_view"),
+                  path('nordbord-test/view/', views.nordbord_test_view, name='nordbord_test_view'),
 
                   # Daily Activity of Coachs
                   path('daily-log/<int:id>/',views.daily_activity_coach_log,name='daily_activity_coach_log'),

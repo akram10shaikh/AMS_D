@@ -1,0 +1,210 @@
+{% extends "player_app/tests/base.html" %}
+{% load static %}
+
+{% block title %}Add Nordbord Test Result{% endblock %}
+
+{% block extra_head %}
+<style>
+    body {
+        background: #fff;
+        font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .form-title {
+        text-align: center;
+        font-size: 1.3em;
+        font-weight: 600;
+        margin-top: 32px;
+        margin-bottom: 24px;
+        color: #234;
+    }
+    .form-container {
+        width: 500px;
+        margin: 0 auto;
+        background: #fafbfc;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        padding: 26px 38px 14px 38px;
+    }
+    .form-group {
+        margin-bottom: 18px;
+        transition: border 0.2s;
+    }
+    label {
+        display: block;
+        font-size: 0.97em;
+        font-weight: 500;
+        color: #435;
+        margin-bottom: 5px;
+    }
+    select, input[type="text"], input[type="date"], input[type="number"], textarea {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 16px;
+        border: 1px solid #cfd8dc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        background: #fff;
+        color: #263238;
+    }
+    select:focus, input:focus, textarea:focus {
+        border-color: #1976d2;
+        outline: none;
+    }
+    textarea {
+        resize: vertical;
+        min-height: 60px;
+        max-height: 120px;
+    }
+    .form-actions {
+        text-align: center;
+    }
+    .btn-main {
+        background: #1976d2;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        font-size: 16px;
+        padding: 10px 0;
+        width: 100%;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-main:hover {
+        background: #1565c0;
+    }
+    .back-link {
+        text-align: left;
+        font-size: 12px;
+        margin-top: 8px;
+        color: #1976d2;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .error-list {
+        margin-bottom: 20px;
+        padding: 10px 18px;
+        background: #ffcdd2;
+        border: 1px solid #ef9a9a;
+        border-radius: 6px;
+        color: #b71c1c;
+        font-size: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-title">Add Nordbord Test Result</div>
+
+<div class="form-container">
+    {% if errors %}
+        <ul class="error-list">
+            {% for err in errors %}
+                <li>{{ err }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="post" autocomplete="off">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="player">Player:</label>
+            <select id="player" name="player" required>
+                <option value="">---------</option>
+                {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="test">Test:</label>
+            <input type="text" id="test" value="{{ test_name }}" disabled>
+        </div>
+
+        <div class="form-group">
+            <label for="date">Date:</label>
+            <input type="date" id="date" name="date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="phase">Phase:</label>
+            {% if request.session.phase_id_test %}
+                {% for event in events %}
+                    {% if event.id == request.session.phase_id_test %}
+                        <input type="text" id="phase_display" value="{{ event.name }}" disabled>
+                        <input type="hidden" name="phase" value="{{ event.id }}">
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <select id="phase" name="phase">
+                    <option value="">---------</option>
+                    {% for event in events %}
+                        <option value="{{ event.id }}">{{ event.name }}</option>
+                    {% endfor %}
+                </select>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="nordic_left">Nordic Left:</label>
+            <input type="number" step="any" id="nordic_left" name="nordic_left" placeholder="Nordic Left">
+        </div>
+
+        <div class="form-group">
+            <label for="nordic_right">Nordic Right:</label>
+            <input type="number" step="any" id="nordic_right" name="nordic_right" placeholder="Nordic Right">
+        </div>
+
+        <div class="form-group">
+            <label for="nordic_imbalance">Nordic Imbalance:</label>
+            <input type="text" id="nordic_imbalance" name="nordic_imbalance" placeholder="Nordic Imbalance">
+        </div>
+
+        <div class="form-group">
+            <label for="isoprone_left">Isoprone Left:</label>
+            <input type="number" step="any" id="isoprone_left" name="isoprone_left" placeholder="Isoprone Left">
+        </div>
+
+        <div class="form-group">
+            <label for="isoprone_right">Isoprone Right:</label>
+            <input type="number" step="any" id="isoprone_right" name="isoprone_right" placeholder="Isoprone Right">
+        </div>
+
+
+        <div class="form-group">
+            <label for="isoprone_imbalance">Isoprone Imbalance:</label>
+            <input type="text" id="isoprone_imbalance" name="isoprone_imbalance" placeholder="Isoprone Imbalance">
+        </div>
+
+        <div class="form-group">
+            <label for="reported_by">Reported by:</label>
+            <select id="reported_by" name="reported_by">
+                <option value="">---------</option>
+                {% for s in staff %}
+                    <option value="{{ s.id }}" style="color:black;">
+                        {% if s.name %}
+                            {{ s.name }}
+                        {% else %}
+                            {{ s.username }}
+                        {% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-main">Add Test Result</button>
+        </div>
+    </form>
+
+    <div class="form-actions" style="margin-top:8px;">
+        <a href="" class="back-link">&larr; Back to List</a>
+    </div>
+</div>
+
+
+{% endblock %}

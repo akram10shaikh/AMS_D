@@ -11093,3 +11093,156 @@ def attendance_group_report(request):
             context['player_summaries'] = player_summaries
 
     return render(request, 'player_app/camps/attendance_group_report.html', context)
+
+
+
+# Nordboard add test 
+
+@login_required
+def add_nordbord_test(request):
+    user_organization = getattr(request.user, 'organization', None)
+    players = Player.objects.all().order_by('name')
+    events = CampTournament.objects.all().order_by('-id')
+    staff = Staff.objects.filter(organization=user_organization)
+    errors = []
+
+    if request.method == 'POST':
+        player_id = request.POST.get('player')
+        date = request.POST.get('date')
+        phase_id = request.POST.get('phase')
+        nordic_right = request.POST.get('nordic_right')
+        nordic_left = request.POST.get('nordic_left')
+        nordic_imbalance = request.POST.get('nordic_imbalance')
+        isoprone_right = request.POST.get('isoprone_right')
+        isoprone_left = request.POST.get('isoprone_left')
+        isoprone_imbalance = request.POST.get('isoprone_imbalance')
+        reported_by_id = request.POST.get('reported_by')
+
+        player = None
+        phase = None
+        reported_by = None
+
+        if not player_id:
+            errors.append("Player is required.")
+        if not date:
+            errors.append("Date is required.")
+        if not reported_by_id:
+            errors.append("Reported by is required.")
+
+        if player_id:
+            try:
+                player = Player.objects.get(id=player_id)
+            except Player.DoesNotExist:
+                errors.append("Selected player does not exist.")
+
+        if phase_id:
+            try:
+                phase = CampTournament.objects.get(id=phase_id)
+            except CampTournament.DoesNotExist:
+                errors.append("Selected phase does not exist.")
+
+        if reported_by_id:
+            try:
+                reported_by = User.objects.get(id=reported_by_id)
+            except User.DoesNotExist:
+                errors.append("Selected staff does not exist.")
+
+        def parse_float(value, field_name):
+            if value in [None, ""]:
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                errors.append(f"{field_name} must be a valid number.")
+                return None
+
+        nordic_right_val = parse_float(nordic_right, "Nordic Right")
+        nordic_left_val = parse_float(nordic_left, "Nordic Left")
+        nordic_imbalance_val = parse_float(nordic_imbalance, "Nordic Imbalance")
+        isoprone_right_val = parse_float(isoprone_right, "Isoprone Right")
+        isoprone_left_val = parse_float(isoprone_left, "Isoprone Left")
+        isoprone_imbalance_val = parse_float(isoprone_imbalance, "Isoprone Imbalance")
+
+        if not errors:
+            NordbordTest.objects.create(
+                player=player,
+                date=date,
+                phase=phase,
+                nordic_right=nordic_right_val,
+                nordic_left=nordic_left_val,
+                nordic_imbalance=nordic_imbalance_val,
+                isoprone_right=isoprone_right_val,
+                isoprone_left=isoprone_left_val,
+                isoprone_imbalance=isoprone_imbalance_val,
+                reported_by=reported_by
+            )
+            return redirect('nordbord_test_view')
+
+    context = {
+        'players': players,
+        'events': events,
+        'staff': staff,
+        'errors': errors,
+        'test_name': 'Nordbord Test',
+        'form_data': request.POST if request.method == 'POST' else {},
+    }
+    return render(request, 'player_app/tests/nordbord_test.html', context)
+
+
+@login_required
+def nordbord_test_view(request):
+    if 'phase_id_test' in request.session:
+        del request.session['phase_id_test']
+
+    user_org = getattr(request.user, "organization", None)
+    test_name = 'Nordbord Test'
+
+    # Filters
+    search_query = request.GET.get('search', '').strip()
+    camp_id = request.GET.get('camp', '').strip()
+    date_str = request.GET.get('date', '').strip()
+
+    # Base queryset
+    results = (
+        NordbordTest.objects
+        .select_related('player', 'phase', 'reported_by')
+        .filter(player__organization=user_org)
+        .order_by('-date', '-id')
+    )
+
+    # Search filter
+    if search_query:
+        results = results.filter(
+            Q(player__name__icontains=search_query) |
+            Q(phase__name__icontains=search_query)
+        )
+
+    # Camp filter
+    if camp_id:
+        results = results.filter(phase_id=camp_id)
+
+    # Date filter
+    if date_str:
+        results = results.filter(date=date_str)
+
+    # Pagination
+    paginator = Paginator(results, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Camps for dropdown
+    camps = CampTournament.objects.filter(
+        participants__organization=user_org
+    ).distinct().order_by('name')
+
+    context = {
+        'test_name': test_name,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'total_results': paginator.count,
+        'search_query': search_query,
+        'selected_camp': camp_id,
+        'selected_date': date_str,
+        'camps': camps,
+    }
+    return render(request, 'player_app/tests/nordbord_test_data.html', context)
