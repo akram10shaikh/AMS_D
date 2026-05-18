@@ -66,3 +66,6 @@ admin.site.register(BowlerDrill)
 admin.site.register(PlayerAttendance)
 admin.site.register(TestActivityLog)
 admin.site.register(DexaScanTest)
+
+from player_app.models import NordbordTest
+admin.site.register(NordbordTest)
