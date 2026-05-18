@@ -4472,7 +4472,8 @@ def add_glute_bridges_test(request):
     
         if not reported_by_id: errors.append("Reported by is required.")
 
-
+        sl_r = int(sl_right) if sl_right and sl_right.isdigit() else None
+        sl_l = int(sl_left) if sl_left and sl_left.isdigit() else None
         # If no errors, save the result
         if not errors:
             phase_data = CampTournament.objects.get(id=int(phase))
@@ -4484,8 +4485,8 @@ def add_glute_bridges_test(request):
                 player=player,
                 date=date,
                 phase=phase_data,
-                right=int(sl_right),
-                left=int(sl_left),
+                right=sl_r,
+                left=sl_l,
                 notes=notes,
                 reported_by=reported_by
             )
