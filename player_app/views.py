@@ -6710,9 +6710,9 @@ def add_ten_meter_test(request):
             player = get_object_or_404(Player, pk=player_id)
 
             # NomativeData lookup (same table as other sprint tests)
-            nomative_data = get_object_or_404(NomativeData, final_level=best_val)
-            total_distance = nomative_data.total_distance
-            approximately_vo2max = nomative_data.approximately_vo2max
+            # nomative_data = get_object_or_404(NomativeData, final_level=best_val)
+            # total_distance = nomative_data.total_distance
+            # approximately_vo2max = nomative_data.approximately_vo2max
 
             # Staff → User
             staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
@@ -6724,8 +6724,8 @@ def add_ten_meter_test(request):
                 phase=phase_obj,
                 best=best_val,
                 notes=notes,
-                distance_covered=total_distance,
-                predicted_vo2max=approximately_vo2max,
+                # distance_covered=total_distance,
+                # predicted_vo2max=approximately_vo2max,
                 reported_by=reported_by_user,
                 gender=player.gender,
                 category=player.age_category,
@@ -6735,7 +6735,7 @@ def add_ten_meter_test(request):
                 phase=phase_obj,
                 actor=reported_by_user,
                 activity_type='Test Added',
-                details=f'Added 10m test with Best: {best_val}, Predicted VO2max: {approximately_vo2max}'   
+                details=f'Added 10m test with Best: {best_val}'   
             )
             if 'phase_id_test' in request.session:
                 return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
