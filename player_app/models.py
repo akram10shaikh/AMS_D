@@ -1852,6 +1852,10 @@ class FortyMeterTest(models.Model):
     class Meta:
         ordering = ['-date']
 
+    def __str__(self):
+        return f"{self.player.name} - {self.phase.name} - {self.created_at}"
+
+
     def save(self, *args, **kwargs):
         """
         - denormalize gender/category
