@@ -2127,6 +2127,9 @@ class TwentyMeterTest(models.Model):
                 camp_agg.max = camp_vals['max_val']
                 camp_agg.average = camp_vals['avg_val']
                 camp_agg.save(update_fields=['min', 'max', 'average'])
+    
+    def __str__(self):
+        return f"{self.player.name} - {self.phase.name} - {self.created_at}"
 
 class TenMeterTest(models.Model):
     player = models.ForeignKey(Player, on_delete=models.CASCADE)
