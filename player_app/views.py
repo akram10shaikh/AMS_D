@@ -6068,6 +6068,7 @@ def add_blood_test(request):
 
 
 # Blood Work Test Data views
+
 def blood_test_view(request, test_name=None):
     if 'phase_id_test' in request.session:
         del request.session['phase_id_test']
