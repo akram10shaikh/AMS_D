@@ -12,6 +12,18 @@
         .add-btn { background: #1976d2; color: #ffffffff; }
         .view-btn { background: #43a047; color: #fff; }
         .create-btn { background: #ff9800; color: #fff; margin: 1em auto; display: block; }
+        .search-box {
+            width: 80%;
+            margin: 1em auto;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
     </style>
 {% endblock %}
 
@@ -20,10 +32,13 @@
     {% comment %} <a href="{% url 'player_record' %}" class="btn btn-secondary" aria-label="View Player Records">View Player Records</a> {% endcomment %}
     <a href="{% url 'nomative_data' %}" class="btn btn-secondary" aria-label="View Nomative Data">View Nomative Data</a>
     <a href="{% url 'player_test_select' %}" class="btn btn-secondary" aria-label="Create New Test Result">Check Test Result</a>
-    <a href="{% url 'multi_test_report' %}" class="btn btn-secondary" aria-label="Multi Test Result">Multi Test Result</a>
+    {% comment %} <a href="{% url 'multi_test_report' %}" class="btn btn-secondary" aria-label="Multi Test Result">Multi Test Result</a> {% endcomment %}
     <a href="{% url 'activity_logs' %}" class="btn btn-secondary" aria-label="View Activity Logs">Activity Logs</a>
-  <table>
-        <thead>
+    <div class="search-box">
+        <input type="text" id="testSearch" placeholder="Search test name..." aria-label="Search test name">
+    </div>
+    <table id="testTable"> 
+        <thead> 
             <tr>
                 <th>No</th>
                 <th>Test Name</th>
@@ -231,7 +246,6 @@
 
     // ... your existing updateAverage() and updateGluteBridges() here ...
 
-    // === SL Lunge Calf Raises Calculations ===
     function updateLungeCalfRaises() {
         var right = parseVal("sl_lunge_calf_right");
         var left = parseVal("sl_lunge_calf_left");
@@ -241,9 +255,8 @@
         var ratioDisplay = document.getElementById("sl_lunge_calf_ratio_display");
         var ratioHidden = document.getElementById("sl_lunge_calf_ratio");
 
-        // S/L Difference (absolute, always positive)
         if (!isNaN(right) && !isNaN(left)) {
-            var diff = Math.abs(left - right);  // absolute difference[web:21][web:25]
+            var diff = Math.abs(left - right);
             diffDisplay.value = diff.toFixed(0);
             diffHidden.value = diff.toFixed(0);
         } else {
@@ -251,7 +264,6 @@
             diffHidden.value = "";
         }
 
-        // SLG Ratio (Left ÷ Right)
         if (!isNaN(left) && !isNaN(right) && right !== 0) {
             var ratio = left / right;
             ratioDisplay.value = ratio.toFixed(3);
@@ -262,12 +274,11 @@
         }
     }
 
-    // Existing listeners for trials and glute bridges...
     var trialIds = ["trial1","trial2","trial3","trial4","trial5","trial6"];
     trialIds.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) {
-            el.addEventListener("input", updateAverage); // uses input event for live updates[web:32]
+            el.addEventListener("input", updateAverage);
         }
     });
 
@@ -278,14 +289,31 @@
         }
     });
 
-    // New listeners for SL Lunge Calf Raises
     ["sl_lunge_calf_right", "sl_lunge_calf_left"].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) {
             el.addEventListener("input", updateLungeCalfRaises);
         }
     });
+
+    // Search test name in table
+    var searchInput = document.getElementById("testSearch");
+    var table = document.getElementById("testTable");
+
+    if (searchInput && table) {
+        searchInput.addEventListener("input", function() {
+            var filter = searchInput.value.toLowerCase().trim();
+            var rows = table.querySelectorAll("tbody tr");
+
+            rows.forEach(function(row) {
+                var testNameCell = row.querySelector("td:nth-child(2)");
+                if (!testNameCell) return;
+
+                var testName = testNameCell.textContent.toLowerCase();
+                row.style.display = testName.indexOf(filter) > -1 ? "" : "none";
+            });
+        });
+    }
 })();
 </script>
-
 {% endblock %}
