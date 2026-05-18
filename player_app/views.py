@@ -5915,7 +5915,7 @@ def dexa_scan_test_view(request):
 
     return render(request, 'player_app/tests/dexa_scan_data.html', context)
 
-# Blood Work Test views
+# Blood work add test views
 def add_blood_test(request):
     user_organization = getattr(request.user, 'organization', None)
     test_name = "Blood Work"
@@ -5957,104 +5957,58 @@ def add_blood_test(request):
 
         errors = []
 
+        # Only player is required
         if not player_id:
             errors.append("Player is required.")
-        if not test:
-            errors.append("Test is required.")
-        if not date:
-            errors.append("Date is required.")
-        if not phase_id:
-            errors.append("Phase is required.")
-        if not blood_hemoglobin:
-            errors.append("Blood Hemoglobin is required.")
-        if not blood_rbc:
-            errors.append("Blood RBC is required.")
-        if not blood_platelets:
-            errors.append("Blood Platelets is required.")
-        if not blood_albumin:
-            errors.append("Blood Albumin is required.")
-        if not blood_globulin:
-            errors.append("Blood Globulin is required.")
-        if not blood_uric_acid:
-            errors.append("Blood Uric Acid is required.")
-        if not blood_creatinine:
-            errors.append("Blood Creatinine is required.")
-        if not blood_testosterone:
-            errors.append("Blood Testosterone is required.")
-        if not blood_iron:
-            errors.append("Blood Iron is required.")
-        if not blood_vitamin_d3:
-            errors.append("Blood Vitamin D3 is required.")
-        if not blood_cholesterol:
-            errors.append("Blood Cholesterol is required.")
-        if not blood_hdl:
-            errors.append("Blood HDL is required.")
-        if not blood_ldl:
-            errors.append("Blood LDL is required.")
-        if not blood_ldl_hdl_ratio:
-            errors.append("Blood LDL/HDL Ratio is required.")
-        if not blood_vitamin_b12:
-            errors.append("Blood Vitamin B12 is required.")
-        if not blood_lipoprotein:
-            errors.append("Blood Lipoprotein is required.")
-        if not blood_homocysteine:
-            errors.append("Blood Homocysteine is required.")
-        if not blood_protein:
-            errors.append("Blood Protein is required.")
-        if not blood_t3:
-            errors.append("Blood T3 is required.")
-        if not blood_t4:
-            errors.append("Blood T4 is required.")
-        if not blood_tsh:
-            errors.append("Blood TSH is required.")
-        if not reported_by_staff_id:
-            errors.append("Reported by is required.")
 
-        # helper for numeric fields (if model uses FloatField/DecimalField)
-        def to_float(value, field_name):
-            nonlocal errors
+        def to_float(value, field_name=None):
             if value in (None, ""):
                 return None
             try:
                 return float(value)
             except (TypeError, ValueError):
-                errors.append(f"{field_name} must be a valid number.")
                 return None
 
-        # cast numerics (adjust if some are CharField)
-        hb_val = to_float(blood_hemoglobin, "Blood Hemoglobin")
-        rbc_val = to_float(blood_rbc, "Blood RBC")
-        platelets_val = to_float(blood_platelets, "Blood Platelets")
-        albumin_val = to_float(blood_albumin, "Blood Albumin")
-        globulin_val = to_float(blood_globulin, "Blood Globulin")
-        uric_acid_val = to_float(blood_uric_acid, "Blood Uric Acid")
-        creatinine_val = to_float(blood_creatinine, "Blood Creatinine")
-        testosterone_val = to_float(blood_testosterone, "Blood Testosterone")
-        iron_val = to_float(blood_iron, "Blood Iron")
-        vit_d3_val = to_float(blood_vitamin_d3, "Blood Vitamin D3")
-        chol_val = to_float(blood_cholesterol, "Blood Cholesterol")
-        hdl_val = to_float(blood_hdl, "Blood HDL")
-        ldl_val = to_float(blood_ldl, "Blood LDL")
-        ldl_hdl_ratio_val = to_float(blood_ldl_hdl_ratio, "Blood LDL/HDL Ratio")
-        vit_b12_val = to_float(blood_vitamin_b12, "Blood Vitamin B12")
-        lipoprotein_val = to_float(blood_lipoprotein, "Blood Lipoprotein")
-        homocysteine_val = to_float(blood_homocysteine, "Blood Homocysteine")
-        protein_val = to_float(blood_protein, "Blood Protein")
-        t3_val = to_float(blood_t3, "Blood T3")
-        t4_val = to_float(blood_t4, "Blood T4")
-        tsh_val = to_float(blood_tsh, "Blood TSH")
+        def to_optional(value):
+            return value.strip() if value and value.strip() else None
+
+        hb_val = to_float(blood_hemoglobin)
+        rbc_val = to_float(blood_rbc)
+        platelets_val = to_float(blood_platelets)
+        albumin_val = to_float(blood_albumin)
+        globulin_val = to_float(blood_globulin)
+        uric_acid_val = to_float(blood_uric_acid)
+        creatinine_val = to_float(blood_creatinine)
+        testosterone_val = to_float(blood_testosterone)
+        iron_val = to_float(blood_iron)
+        vit_d3_val = to_float(blood_vitamin_d3)
+        chol_val = to_float(blood_cholesterol)
+        hdl_val = to_float(blood_hdl)
+        ldl_val = to_float(blood_ldl)
+        ldl_hdl_ratio_val = to_float(blood_ldl_hdl_ratio)
+        vit_b12_val = to_float(blood_vitamin_b12)
+        lipoprotein_val = to_float(blood_lipoprotein)
+        homocysteine_val = to_float(blood_homocysteine)
+        protein_val = to_float(blood_protein)
+        t3_val = to_float(blood_t3)
+        t4_val = to_float(blood_t4)
+        tsh_val = to_float(blood_tsh)
 
         if not errors:
-            phase_obj = get_object_or_404(CampTournament, id=int(phase_id))
             player = get_object_or_404(Player, pk=player_id)
 
-            # Staff → User for reported_by
-            staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
-            reported_by_user = staff_obj.user  # change if relation name differs
+            phase_obj = None
+            if phase_id:
+                phase_obj = get_object_or_404(CampTournament, id=int(phase_id))
+
+            reported_by_user = None
+            if reported_by_staff_id:
+                staff_obj = get_object_or_404(Staff, pk=reported_by_staff_id)
+                reported_by_user = staff_obj.user
 
             BloodTest.objects.create(
                 player=player,
-                date=date,
+                date=to_optional(date),
                 phase=phase_obj,
 
                 blood_hemoglobin=hb_val,
@@ -6080,18 +6034,21 @@ def add_blood_test(request):
                 blood_tsh=tsh_val,
                 gender=player.gender,
                 category=player.age_category,
-                notes=notes,
+                notes=to_optional(notes),
                 reported_by=reported_by_user,
             )
-            TestActivityLog.objects.create(
-                subject=player,
-                phase=phase_obj,
-                actor=reported_by_user,
-                activity_type='Test Added',
-                details=f'Added Blood Work test with Hemoglobin: {hb_val}, Cholesterol: {chol_val}, Vitamin D3: {vit_d3_val}'
-            )
+
+            if phase_obj and reported_by_user:
+                TestActivityLog.objects.create(
+                    subject=player,
+                    phase=phase_obj,
+                    actor=reported_by_user,
+                    activity_type='Test Added',
+                    details=f'Added Blood Work test with Hemoglobin: {hb_val}, Cholesterol: {chol_val}, Vitamin D3: {vit_d3_val}'
+                )
+
             if 'phase_id_test' in request.session:
-                return redirect('phase_tests_view',id=request.session.get('phase_id_test'))
+                return redirect('phase_tests_view', id=request.session.get('phase_id_test'))
             return redirect('test_dashboard_new')
 
         return render(request, 'player_app/tests/blood_work.html', {
