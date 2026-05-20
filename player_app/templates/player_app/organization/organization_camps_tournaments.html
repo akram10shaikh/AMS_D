@@ -116,7 +116,7 @@
         background-color: #222;
         color: #ddd;
         border-radius: 12px;
-        overflow: visible; /* Changed for hover content */
+        overflow: visible;
         box-shadow: 0 4px 14px rgba(255, 255, 255, 0.1);
         cursor: pointer;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -145,7 +145,7 @@
         padding: 15px 20px;
         font-size: 0.9rem;
         color: #ccc;
-        min-height: 160px; /* Increased for hover space */
+        min-height: 160px;
     }
 
     .camp-card-body p {
@@ -157,26 +157,21 @@
         font-weight: 600;
     }
 
-    /* NEW: Hover info styles */
+    /* Always visible stats info */
     .camp-hover-info {
         margin-top: 10px;
-        opacity: 0;
-        transform: translateY(10px);
-        transition: all 0.3s ease;
         font-size: 0.85rem;
         background: rgba(0, 123, 255, 0.1);
         padding: 8px 12px;
         border-radius: 6px;
         border-left: 3px solid #007bff;
+        opacity: 1;
+        transform: translateY(0);
+        display: block;
     }
 
     .camp-hover-info p {
         margin: 4px 0;
-    }
-
-    .camp-card:hover .camp-hover-info {
-        opacity: 1;
-        transform: translateY(0);
     }
 
     /* Camp Actions Bar */
@@ -254,6 +249,7 @@
         background: #0a0b0cff;
         margin: 0 1rem 1.5rem 1rem;
     }
+
     .camp-year-tab {
         border: none;
         padding: 8px 18px;
@@ -264,27 +260,29 @@
         font-weight: 600;
         cursor: pointer;
     }
+
     .camp-year-tab--active {
         background: #ffffff;
         color: #16a34a;
         box-shadow: 0 2px 6px rgba(15,23,42,0.18);
     }
+
     .camp-year-panel--hidden {
         display: none;
     }
 
     .status-pill {
-    position: relative;
-    display: block;
-    margin-bottom: 8px;
-    background: rgba(54, 225, 86, 0.12);
-    color: #fff;
-    font-weight: 700;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 14px;
-    cursor: pointer;
-    border: 1px solid rgba(54, 225, 86, 0.25);
+        position: relative;
+        display: block;
+        margin-bottom: 8px;
+        background: rgba(54, 225, 86, 0.12);
+        color: #fff;
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 14px;
+        cursor: pointer;
+        border: 1px solid rgba(54, 225, 86, 0.25);
     }
 
     .staff-pill {
@@ -324,17 +322,18 @@
 <div class="header-container" style="display: flex; justify-content: space-between; align-items: center;color:white;">
     <h1 style="color:white;">Camps & Tournaments</h1>
     {% if user.staff.create_camps_tournaments %}
-   
+    {% comment %} <a href="{% url 'player_wellness_report_data' %}" class="btn btn-primary">Player Daily Wellness</a> {% endcomment %}
+    {% comment %} <a href="{% url 'attendance_group_view' %}" class="btn btn-primary">Group Attendance</a> {% endcomment %}
+    {% comment %} <a href="{% url 'wellness_dashboard' %}" class="btn btn-primary">Group Wellness Report</a> {% endcomment %}
+    {% comment %} <a href="{% url 'snc_camps_dashboard' %}" class="btn btn-primary">All Daily S&C Coach's Log</a> {% endcomment %}
     <a href="{% url 'organization_create_camp' %}" class="btn btn-primary">Create New Camp</a>
     {% endif %}
 </div>
 
-<!-- Search Bar -->
 <div class="search-bar">
     <input type="text" id="searchInput" placeholder="Search by name...">
 </div>
 
-<!-- Show Organizations Dropdown for Superusers -->
 {% if request.user.is_superuser %}
     <div class="container">
         <h2>Select Organization</h2>
@@ -348,7 +347,6 @@
     </div>
 {% endif %}
 
-<!-- Camps & Tournaments Year Range Tabs -->
 <div class="camp-year-tabs" id="campYearTabs">
  {% for range_key in camps_by_range.keys %}
     <button type="button"
@@ -359,7 +357,6 @@
  {% endfor %}
 </div>
 
-<!-- Camps & Tournaments List grouped by year range -->
 <div id="campsContainer" class="container" style="margin-bottom:100px;">
  {% for range_key, items in camps_by_range.items %}
     <div class="camp-year-panel {% if not forloop.first %}camp-year-panel--hidden{% endif %}"
@@ -373,8 +370,7 @@
              <p><strong>Start Date:</strong> {{ camp.start_date }}</p>
              <p><strong>End Date:</strong> {{ camp.end_date|default:"N/A" }}</p>
              <p><strong>Venue:</strong> {{ camp.venue|default:"N/A" }}</p>
-             
-             <!-- Hover info - hidden by default -->
+
              <div class="camp-hover-info">
                 <div class="status-pill tooltip-trigger players-pill">
                     <strong>👥 Players:</strong> <span class="player-count">0</span>
@@ -385,7 +381,7 @@
                     <strong>👨‍💼 Staff:</strong> <span class="staff-count">0</span>
                     <div class="custom-tooltip staff-tooltip">No staff</div>
                 </div>
-            </div>
+             </div>
            </div>
            <div class="camp-actions">
              <a href="{% url 'organization_camp_detail' camp.id %}" class="btn btn-primary">View</a>
@@ -445,19 +441,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  let hoverTimeout;
   document.querySelectorAll('.camp-card').forEach(card => {
-    card.addEventListener('mouseenter', () => {
-      const campId = card.dataset.campId;
-      if (!campId) return;
-
-      clearTimeout(hoverTimeout);
-      hoverTimeout = setTimeout(() => loadCampStats(campId), 100);
-    });
-
-    card.addEventListener('mouseleave', () => {
-      clearTimeout(hoverTimeout);
-    });
+    const campId = card.dataset.campId;
+    if (campId) {
+      loadCampStats(campId);
+    }
   });
 
   function resetToActiveTab() {

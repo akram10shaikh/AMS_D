@@ -11247,3 +11247,212 @@ def nordbord_test_view(request):
         'camps': camps,
     }
     return render(request, 'player_app/tests/nordbord_test_data.html', context)
+
+
+
+# Individual Player Bowling Add Test 
+@login_required
+def add_bowler_drill(request):
+    errors = []
+
+    players = Player.objects.filter().order_by('name')
+
+    if request.user.is_superuser:
+        camps = CampTournament.objects.all().order_by('-start_date', 'name')
+    else:
+        camps = CampTournament.objects.filter(
+            organization=request.user.organization
+        ).order_by('-start_date', 'name')
+
+    if request.method == "POST":
+        player_id = request.POST.get("player")
+        camp_id = request.POST.get("camp")
+        date_str = request.POST.get("date")
+        no_balls = request.POST.get("no_balls")
+
+        player = None
+        camp = None
+        drill_date = None
+
+        if not player_id:
+            errors.append("Player is required.")
+
+        if not camp_id:
+            errors.append("Camp/Tournament is required.")
+
+        if not date_str:
+            errors.append("Date is required.")
+
+        if not no_balls:
+            errors.append("Number of balls is required.")
+
+        if player_id:
+            try:
+                player = Player.objects.get(id=player_id)
+            except Player.DoesNotExist:
+                errors.append("Selected player does not exist.")
+
+        if camp_id:
+            try:
+                if request.user.is_superuser:
+                    camp = CampTournament.objects.get(id=camp_id)
+                else:
+                    camp = CampTournament.objects.get(
+                        id=camp_id,
+                        organization=request.user.organization
+                    )
+            except CampTournament.DoesNotExist:
+                errors.append("Selected camp/tournament does not exist.")
+
+        if date_str:
+            try:
+                drill_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                errors.append("Invalid date format.")
+
+        if no_balls:
+            try:
+                no_balls = int(no_balls)
+                if no_balls < 0:
+                    errors.append("Number of balls cannot be negative.")
+            except ValueError:
+                errors.append("Number of balls must be a valid integer.")
+
+        if player and camp:
+            player_has_camp = CampTournament.objects.filter(
+                id=camp.id,
+                participants=player
+            ).exists()
+
+            if not player_has_camp:
+                errors.append("This player is not assigned to the selected camp/tournament.")
+
+        if not errors and player and camp and drill_date is not None:
+            obj, created = BowlerDrill.objects.update_or_create(
+                player=player,
+                camp=camp,
+                date=drill_date,
+                defaults={
+                    "no_balls": no_balls
+                }
+            )
+
+            if created:
+                messages.success(request, "Bowler drill saved successfully.")
+            else:
+                messages.success(request, "Existing bowler drill updated successfully.")
+
+            return redirect("add_bowler_drill")
+
+    return render(request, "player_app/tests/add_bowler_drill.html", {
+        "players": players,
+        "camps": camps,
+        "errors": errors,
+    })
+
+
+@login_required
+def get_player_camps_for_bowler_drill(request):
+    player_id = request.GET.get("player_id")
+
+    if not player_id:
+        return JsonResponse({"camps": []})
+
+    try:
+        player = Player.objects.get(id=player_id)
+        print(f"DEBUG: Found player - ID: {player.id}, Name: {player.name}")
+    except Player.DoesNotExist:
+        print(f"DEBUG: Player not found - ID: {player_id}")
+        return JsonResponse({"camps": []})
+
+    if request.user.is_superuser:
+        player_camps = CampTournament.objects.filter(
+            participants=player
+        ).order_by('-start_date', 'name')
+    else:
+        player_camps = CampTournament.objects.filter(
+            participants=player,
+            organization=request.user.organization
+        ).order_by('-start_date', 'name')
+
+    camps_data = [
+        {
+            "id": camp.id,
+            "name": camp.name,
+            "label": f"{camp.name} ({camp.start_date} to {camp.end_date if camp.end_date else 'N/A'})"
+        }
+        for camp in player_camps
+    ]
+
+    return JsonResponse({"camps": camps_data})
+
+
+@login_required
+def get_bowler_drill_data(request):
+    player_id = request.GET.get("player_id")
+    camp_id = request.GET.get("camp_id")
+    date_str = request.GET.get("date")
+
+    if not player_id or not camp_id or not date_str:
+        return JsonResponse({
+            "exists": False,
+            "no_balls": ""
+        })
+
+    try:
+        drill_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({
+            "exists": False,
+            "no_balls": ""
+        })
+
+    drill = BowlerDrill.objects.filter(
+        player_id=player_id,
+        camp_id=camp_id,
+        date=drill_date
+    ).first()
+
+    if drill:
+        return JsonResponse({
+            "exists": True,
+            "no_balls": drill.no_balls
+        })
+
+    return JsonResponse({
+        "exists": False,
+        "no_balls": ""
+    })
+
+
+# Individual Player Bowling data view with filters and pagination
+def bowler_drill_report_view(request):
+    players = Player.objects.all().order_by('name')
+
+    drills = BowlerDrill.objects.select_related('player', 'camp').all().order_by('-date', 'player__name')
+
+    selected_player = request.GET.get('player', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+
+    if selected_player:
+        drills = drills.filter(player_id=selected_player)
+
+    if start_date:
+        drills = drills.filter(date__gte=start_date)
+
+    if end_date:
+        drills = drills.filter(date__lte=end_date)
+
+    paginator = Paginator(drills, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'players': players,
+        'selected_player': selected_player,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'player_app/tests/bowler_drill_report.html', context)

@@ -238,6 +238,11 @@ urlpatterns = [
 
                   path('player-test-data/', views.get_player_test_data, name='player_test_data'),
 
+                   # Bowler Drills
+                  path("bowler-drill/add/", views.add_bowler_drill, name="add_bowler_drill"),
+                  path("bowler-drill/player-camps/", views.get_player_camps_for_bowler_drill, name="get_player_camps_for_bowler_drill"),
+                  path("bowler-drill/check/", views.get_bowler_drill_data, name="get_bowler_drill_data"),
+                  path('bowler-drill-report/', views.bowler_drill_report_view, name='bowler_drill_report_view'),
 
 
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

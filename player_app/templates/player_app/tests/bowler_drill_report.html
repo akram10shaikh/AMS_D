@@ -1,0 +1,150 @@
+{% extends "player_app/organization/base.html" %}
+{% load static %}
+
+{% block title %}Bowler Drill Report{% endblock %}
+
+{% block content %}
+<div class="report-page" style="max-width: 1200px; margin: 0 auto; padding: 20px; margin-bottom: 100px;">
+
+    <div style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <h1 style="margin: 0; font-size: 28px; color: #333;">📊 Bowler Drill Report</h1>
+    </div>
+
+    <form method="get" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e9ecef;">
+        <div style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
+
+            <div style="min-width: 260px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Player:</label>
+                <select
+                    name="player"
+                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                >
+                    <option value="">All Players</option>
+                    {% for player in players %}
+                        <option value="{{ player.id }}" {% if selected_player == player.id|stringformat:"s" %}selected{% endif %}>
+                            {{ player.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Start Date:</label>
+                <input
+                    type="date"
+                    name="start_date"
+                    value="{{ start_date }}"
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                >
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">End Date:</label>
+                <input
+                    type="date"
+                    name="end_date"
+                    value="{{ end_date }}"
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                >
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" style="background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                    Search
+                </button>
+                <a href="{% url 'bowler_drill_report_view' %}" style="background: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 14px; line-height: 1;">
+                    Clear
+                </a>
+            </div>
+        </div>
+    </form>
+
+    {% if selected_player or start_date or end_date %}
+    <div style="margin-bottom: 20px; padding: 12px; background: #e7f3ff; border-radius: 5px; border-left: 4px solid #007bff;">
+        <strong>Showing {{ page_obj.paginator.count }} results</strong>
+        {% if selected_player %}(player selected){% endif %}
+        {% if start_date %}(from: {{ start_date }}){% endif %}
+        {% if end_date %}(to: {{ end_date }}){% endif %}
+    </div>
+    {% endif %}
+
+    <div style="background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">No</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Player</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Camp / Tournament</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">Date</th>
+                    <th style="padding: 15px 12px; text-align: left; font-weight: 600; color: #495057;">No. of Balls</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for drill in page_obj %}
+                <tr style="border-bottom: 1px solid #e9ecef;">
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ page_obj.start_index|add:forloop.counter0 }}
+                    </td>
+                    <td style="padding: 15px 12px; font-weight: 500; color: #333;">
+                        <strong>{{ drill.player.name }}</strong>
+                    </td>
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ drill.camp.name }}
+                    </td>
+                    <td style="padding: 15px 12px; color: #666;">
+                        {{ drill.date }}
+                    </td>
+                    <td style="padding: 15px 12px; font-weight: bold; color: #28a745; font-size: 16px;">
+                        {{ drill.no_balls }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 40px; text-align: center; color: #6c757d; font-style: italic;">
+                        No bowler drill data found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div style="color: #666; font-size: 14px;">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} total results)
+            </div>
+
+            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1{% if selected_player %}&player={{ selected_player }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}"
+                       style="padding: 8px 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">
+                        First
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if selected_player %}&player={{ selected_player }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}"
+                       style="padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">
+                        Previous
+                    </a>
+                {% endif %}
+
+                <span style="padding: 8px 12px; background: #007bff; color: white; border-radius: 4px; font-weight: 500;">
+                    {{ page_obj.number }}
+                </span>
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if selected_player %}&player={{ selected_player }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}"
+                       style="padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">
+                        Next
+                    </a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if selected_player %}&player={{ selected_player }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}"
+                       style="padding: 8px 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">
+                        Last
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
